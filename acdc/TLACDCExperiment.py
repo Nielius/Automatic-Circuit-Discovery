@@ -486,14 +486,12 @@ class TLACDCExperiment:
             pickle.dump(edges_list, f)
 
     def add_sender_hook(self, node, override=False):
-        if not override and len(self.model.hook_dict[node.name].fwd_hooks) > 0:
-            fwd_hooks = self.model.hook_dict[node.name].fwd_hooks
-            if len(fwd_hooks) > 0:
-                resolved_hooks_dicts = [fwd_hook.hook.hooks_dict_ref() for fwd_hook in fwd_hooks]
-                assert all([resolved_hooks_dict == resolved_hooks_dicts[0] for resolved_hooks_dict in resolved_hooks_dicts]), f"{resolved_hooks_dicts}\nUnexpected behavior: different hook dict for different hooks on the same HookPoint?! https://github.com/neelnanda-io/TransformerLens/issues/297"
-                for fwd_hook in resolved_hooks_dicts[0].values():
-                    hook_func_name = fwd_hook.__wrapped__.__name__ if isinstance(fwd_hook, partial) else fwd_hook.__name__
-                    assert "sender_hook" in hook_func_name, f"You should only add sender hooks to {node.name}, and this: {hook_func_name} doesn't look like a sender hook"
+        if not override and len(fwd_hooks := self.model.hook_dict[node.name].fwd_hooks) > 0:
+            resolved_hooks_dicts = [fwd_hook.hook.hooks_dict_ref() for fwd_hook in fwd_hooks]
+            assert all([resolved_hooks_dict == resolved_hooks_dicts[0] for resolved_hooks_dict in resolved_hooks_dicts]), f"{resolved_hooks_dicts}\nUnexpected behavior: different hook dict for different hooks on the same HookPoint?! https://github.com/neelnanda-io/TransformerLens/issues/297"
+            for fwd_hook in resolved_hooks_dicts[0].values():
+                hook_func_name = fwd_hook.__wrapped__.__name__ if isinstance(fwd_hook, partial) else fwd_hook.__name__
+                assert "sender_hook" in hook_func_name, f"You should only add sender hooks to {node.name}, and this: {hook_func_name} doesn't look like a sender hook"
             return False # already added, move on
 
         self.model.add_hook(
@@ -504,14 +502,12 @@ class TLACDCExperiment:
         return True
 
     def add_receiver_hook(self, node, override=False, prepend=False):
-        if not override and len(self.model.hook_dict[node.name].fwd_hooks) > 0: # repeating code from add_sender_hooks
-            fwd_hooks = self.model.hook_dict[node.name].fwd_hooks
-            if len(fwd_hooks) > 0:
-                resolved_hooks_dicts = [fwd_hook.hook.hooks_dict_ref() for fwd_hook in fwd_hooks]
-                assert all([resolved_hooks_dict == resolved_hooks_dicts[0] for resolved_hooks_dict in resolved_hooks_dicts]), f"{resolved_hooks_dicts}\nUnexpected behavior: different hook dict for different hooks on the same HookPoint?! https://github.com/neelnanda-io/TransformerLens/issues/297"
-                for fwd_hook in resolved_hooks_dicts[0].values():
-                    hook_func_name = fwd_hook.__wrapped__.__name__ if isinstance(fwd_hook, partial) else fwd_hook.__name__
-                    assert "receiver_hook" in hook_func_name, f"You should only add receiver hooks to {node.name}, and this: {hook_func_name} doesn't look like a receiver hook"
+        if not override and len(fwd_hooks := self.model.hook_dict[node.name].fwd_hooks) > 0: # repeating code from add_sender_hooks
+            resolved_hooks_dicts = [fwd_hook.hook.hooks_dict_ref() for fwd_hook in fwd_hooks]
+            assert all([resolved_hooks_dict == resolved_hooks_dicts[0] for resolved_hooks_dict in resolved_hooks_dicts]), f"{resolved_hooks_dicts}\nUnexpected behavior: different hook dict for different hooks on the same HookPoint?! https://github.com/neelnanda-io/TransformerLens/issues/297"
+            for fwd_hook in resolved_hooks_dicts[0].values():
+                hook_func_name = fwd_hook.__wrapped__.__name__ if isinstance(fwd_hook, partial) else fwd_hook.__name__
+                assert "receiver_hook" in hook_func_name, f"You should only add receiver hooks to {node.name}, and this: {hook_func_name} doesn't look like a receiver hook"
             return False # already added, move on
 
         self.model.add_hook(
@@ -538,11 +534,11 @@ class TLACDCExperiment:
             print("New metric:", cur_metric)
 
         if self.current_node.incoming_edge_type.value != EdgeType.PLACEHOLDER.value:
-            added_receiver_hook = self.add_receiver_hook(self.current_node, override=True, prepend=True)
+            self.add_receiver_hook(self.current_node, override=True, prepend=True)
 
         if self.current_node.incoming_edge_type.value == EdgeType.DIRECT_COMPUTATION.value:
             # basically, because these nodes are the only ones that act as both receivers and senders
-            added_sender_hook = self.add_sender_hook(self.current_node, override=True)
+            self.add_sender_hook(self.current_node, override=True)
 
         is_this_node_used = False
         if self.current_node.name in ["blocks.0.hook_resid_pre", "hook_pos_embed", "hook_embed"]:
