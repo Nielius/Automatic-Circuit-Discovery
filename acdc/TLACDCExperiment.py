@@ -115,7 +115,6 @@ class TLACDCExperiment:
 
         if skip_edges != "no":
             warnings.warn("Never skipping edges, for now")
-            skip_edges = "no"
 
         self.corr = TLACDCCorrespondence.setup_from_model(self.model, use_pos_embed=use_pos_embed)
 
@@ -125,7 +124,6 @@ class TLACDCExperiment:
         self.reverse_topologically_sort_corr()
         self.current_node = self.corr.first_node()
         print(f"{self.current_node=}")
-        self.corr = self.corr
 
         self.ds = ds
         self.ref_ds = ref_ds
