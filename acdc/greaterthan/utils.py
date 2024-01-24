@@ -1,22 +1,4 @@
 from collections import OrderedDict
-from acdc.TLACDCEdge import (
-    TorchIndex,
-    Edge, 
-    EdgeType,
-)  # these introduce several important classes !!!
-from acdc.TLACDCInterpNode import TLACDCInterpNode
-import warnings
-from functools import partial
-from copy import deepcopy
-import torch.nn.functional as F
-from typing import List
-from acdc.acdc_utils import kl_divergence
-import torch
-from acdc.ioi.ioi_dataset import IOIDataset  # NOTE: we now import this LOCALLY so it is deterministic
-from tqdm import tqdm
-import wandb
-from transformer_lens.HookedTransformer import HookedTransformer
-import warnings
 from functools import partial
 from typing import ClassVar, Optional
 
@@ -26,7 +8,6 @@ import torch.nn.functional as F
 from acdc.acdc_utils import kl_divergence, TorchIndex
 from acdc.docstring.utils import AllDataThings
 from acdc.ioi.utils import get_gpt2_small
-from collections import OrderedDict
 
 NOUNS = [
     "abduction", "accord", "affair", "agreement", "appraisal",
