@@ -4,6 +4,7 @@ import time
 import warnings
 from argparse import Namespace
 from collections import OrderedDict
+from dataclasses import dataclass
 from functools import partial
 from typing import Callable, Optional, Literal, List, Dict, Tuple, Union, TypeVar
 
@@ -30,6 +31,19 @@ Subgraph = Dict[
 ]  # an alias for loading and saving from WANDB (primarily)
 
 T = TypeVar("T")
+
+
+
+@dataclass
+class WandbSettings:
+    wandb_entity_name: str = "",
+    wandb_project_name: str = "",
+    wandb_run_name: str = "",
+    wandb_group_name: str = "",
+    wandb_notes: str = "",
+    wandb_dir: Optional[str] = None,
+    wandb_mode: str = "online",
+    wandb_config: Optional[Namespace] = None,
 
 
 class TLACDCExperiment:
@@ -66,14 +80,7 @@ class TLACDCExperiment:
         zero_ablation: bool = False,  # use zero rather than
         abs_value_threshold: bool = False,
         show_full_index=False,
-        using_wandb: bool = False,
-        wandb_entity_name: str = "",
-        wandb_project_name: str = "",
-        wandb_run_name: str = "",
-        wandb_group_name: str = "",
-        wandb_notes: str = "",
-        wandb_dir: Optional[str] = None,
-        wandb_mode: str = "online",
+        wandb_settings: WandbSettings | None = None,
         use_pos_embed: bool = False,
         skip_edges="no",
         add_sender_hooks: bool = True,
@@ -82,7 +89,6 @@ class TLACDCExperiment:
             "normal", "reverse", "shuffle"
         ] = "reverse",  # we get best performance with reverse I think
         names_mode: Literal["normal", "reverse", "shuffle"] = "normal",
-        wandb_config: Optional[Namespace] = None,
         early_exit: bool = False,
         positions: Optional[List[int]] = None,  # if None, do not split by position. TODO change the syntax here...
     ):
@@ -151,17 +157,17 @@ class TLACDCExperiment:
             add_receiver_hooks=add_receiver_hooks,
         )
 
-        self.using_wandb = using_wandb
-        if using_wandb:
+        self.using_wandb = bool(wandb_settings)
+        if self.using_wandb:
             wandb.init(
-                entity=wandb_entity_name,
-                group=wandb_group_name,
-                project=wandb_project_name,
-                name=wandb_run_name,
-                notes=wandb_notes,
-                dir=wandb_dir,
-                mode=wandb_mode,
-                config=wandb_config,
+                entity=wandb_settings.wandb_entity_name,
+                group=wandb_settings.wandb_group_name,
+                project=wandb_settings.wandb_project_name,
+                name=wandb_settings.wandb_run_name,
+                notes=wandb_settings.wandb_notes,
+                dir=wandb_settings.wandb_dir,
+                mode=wandb_settings.wandb_mode,
+                config=wandb_settings.wandb_config,
             )
 
         self.metric = lambda x: metric(x).item()
