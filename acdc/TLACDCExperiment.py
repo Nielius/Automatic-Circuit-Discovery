@@ -203,7 +203,7 @@ class TLACDCExperiment:
                 self.cur_second_metric = self.second_metric(logits)
 
         if recalc_edges:
-            self.cur_edges = self.count_no_edges()
+            self.cur_edges = self.count_num_edges()
 
         if initial:
             assert abs(self.cur_metric) < 1e-5, f"Metric {self.cur_metric=} is not zero"
@@ -778,8 +778,8 @@ class TLACDCExperiment:
 
             print("But it's bad")
 
-    def count_no_edges(self, verbose=False) -> int:
-        cnt = self.corr.count_no_edges(verbose=verbose)
+    def count_num_edges(self, verbose=False) -> int:
+        cnt = self.corr.count_num_edges(verbose=verbose)
         if self.verbose:
             print("No edge", cnt)
         return cnt

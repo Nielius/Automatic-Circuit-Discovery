@@ -1,7 +1,7 @@
 import sys
 from collections import defaultdict
 from enum import Enum
-from typing import Optional, List
+from typing import Optional, List, TypeAlias
 
 
 class EdgeType(Enum):
@@ -50,6 +50,9 @@ class Edge:
 
     def __repr__(self) -> str:
         return f"Edge({self.edge_type}, {self.present})"
+
+
+HookPointName: TypeAlias = str
 
 class TorchIndex:
     """There is not a clean bijection between things we 

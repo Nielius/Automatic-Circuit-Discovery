@@ -592,7 +592,7 @@ if __name__ == "__main__":
 
     # Update dict with some different things
     to_log_dict["nodes_to_mask"] = list(map(str, to_log_dict["nodes_to_mask"]))
-    to_log_dict["number_of_edges"] = corr.count_no_edges()
+    to_log_dict["number_of_edges"] = corr.count_num_edges()
     to_log_dict["percentage_binary"] = percentage_binary
 
     wandb.log(to_log_dict)

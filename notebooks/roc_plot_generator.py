@@ -406,7 +406,7 @@ exp = TLACDCExperiment(
 if not SKIP_ACDC and not ONLY_SAVE_CANONICAL:
     exp.setup_corrupted_cache()
 
-max_subgraph_size = exp.corr.count_no_edges()
+max_subgraph_size = exp.corr.count_num_edges()
 
 #%% [markdown]
 # Load the *canonical* circuit
@@ -435,7 +435,7 @@ if TASK != "induction":
     canonical_circuit_subgraph = deepcopy(exp.corr)
     for t in exp.corr.all_edges().keys():
         exp.corr.edges[t[0]][t[1]][t[2]][t[3]].present = True
-    canonical_circuit_subgraph_size = canonical_circuit_subgraph.count_no_edges()
+    canonical_circuit_subgraph_size = canonical_circuit_subgraph.count_num_edges()
 
     # and reset the sugbgraph...
     for t, e in exp.corr.all_edges().items():
@@ -606,7 +606,7 @@ def get_acdc_runs(
                         )
                     else:
                         corr.edges[child.name][child.index][parent.name][parent.index].present = True
-                print("Before copying: n_edges=", corr.count_no_edges())
+                print("Before copying: n_edges=", corr.count_num_edges())
 
                 corr_all_edges = corr.all_edges().items()
 
@@ -618,7 +618,7 @@ def get_acdc_runs(
                 for tupl, edge in corr_all_edges:
                     new_all_edges[tupl].present = edge.present
 
-                print("After copying: n_edges=", corr_to_copy.count_no_edges())
+                print("After copying: n_edges=", corr_to_copy.count_num_edges())
 
                 # Correct score_d to reflect the actual number of steps that we are collecting
                 score_d["steps"] = latest_fname_step
@@ -682,7 +682,7 @@ def get_acdc_runs(
     for candidate in all_candidates:
         test_metrics = exp.call_metric_with_corr(candidate.corr, all_test_fns, things.test_data)
         candidate.score_d.update(test_metrics)
-        print(f"Added run with threshold={candidate.threshold}, n_edges={candidate.corr.count_no_edges()}")
+        print(f"Added run with threshold={candidate.threshold}, n_edges={candidate.corr.count_num_edges()}")
 
     corrs = [(candidate.corr, candidate.score_d) for candidate in all_candidates]
     if return_ids:
@@ -890,7 +890,7 @@ def get_points(corrs_and_scores, decreasing=True):
             a.update(score)
             score = a
 
-        n_edges = corr.count_no_edges()
+        n_edges = corr.count_num_edges()
         n_nodes = len(filter_nodes(get_present_nodes(corr)[0]))
 
         score.update({"n_edges": n_edges, "n_nodes": n_nodes})

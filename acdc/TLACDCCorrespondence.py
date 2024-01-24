@@ -2,8 +2,8 @@ from acdc.TLACDCInterpNode import TLACDCInterpNode
 from collections import OrderedDict
 from acdc.TLACDCEdge import (
     TorchIndex,
-    Edge, 
-    EdgeType,
+    Edge,
+    EdgeType, HookPointName,
 )  # these introduce several important classes !!!
 from acdc.acdc_utils import OrderedDefaultdict, make_nd_dict
 from typing import List, Dict, MutableMapping, Optional, Tuple, Union, Set, Callable, TypeVar, Iterable, Any
@@ -14,8 +14,8 @@ class TLACDCCorrespondence:
     
     The two attributes, self.graph and self.edges allow for efficiently looking up the nodes and edges in the graph: see `notebooks/editing_edges.py`"""
 
-    nodes: MutableMapping[str, MutableMapping[TorchIndex, TLACDCInterpNode]]
-    edges: MutableMapping[str, MutableMapping[TorchIndex, MutableMapping[str, MutableMapping[TorchIndex, Edge]]]]
+    nodes: MutableMapping[HookPointName, MutableMapping[TorchIndex, TLACDCInterpNode]]
+    edges: MutableMapping[HookPointName, MutableMapping[TorchIndex, MutableMapping[HookPointName, MutableMapping[TorchIndex, Edge]]]]
     def __init__(self):
         self.nodes = OrderedDefaultdict(OrderedDict)
         self.edges = make_nd_dict(end_type=None, n=4)
@@ -27,7 +27,7 @@ class TLACDCCorrespondence:
         """Concatenate all nodes in the graph"""
         return [node for by_index_list in self.nodes.values() for node in by_index_list.values()]
     
-    def all_edges(self) -> Dict[Tuple[str, TorchIndex, str, TorchIndex], Edge]:
+    def all_edges(self) -> Dict[Tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], Edge]:
         """Concatenate all edges in the graph"""
         
         big_dict = {}
@@ -69,9 +69,9 @@ class TLACDCCorrespondence:
     
     def remove_edge(
         self,
-        child_name: str,
+        child_name: HookPointName,
         child_index: TorchIndex,
-        parent_name: str,
+        parent_name: HookPointName,
         parent_index: TorchIndex,
     ):
         try:
@@ -232,7 +232,7 @@ class TLACDCCorrespondence:
     
         return correspondence
 
-    def count_no_edges(self, verbose=False):
+    def count_num_edges(self, verbose=False) -> int:
         cnt = 0
 
         for tupl, edge in self.all_edges().items():

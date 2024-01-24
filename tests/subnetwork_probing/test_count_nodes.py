@@ -138,4 +138,4 @@ def test_count_nodes():
     assert len(g2.edges) == 41
 
     corr, _ = iterative_correspondence_from_mask(model, nodes_to_mask)
-    assert corr.count_no_edges() == 41
+    assert corr.count_num_edges() == 41

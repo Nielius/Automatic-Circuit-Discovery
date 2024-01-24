@@ -328,7 +328,7 @@ for nodes, hook_name, idx in tqdm.tqdm(nodes_names_indices):
 
     to_log_dict = test_metrics(model(things.test_data), score)
     to_log_dict = test_metrics(model(things.validation_data), score)
-    to_log_dict["number_of_edges"] = corr.count_no_edges()
+    to_log_dict["number_of_edges"] = corr.count_num_edges()
 
     print(to_log_dict)
     wandb.log(to_log_dict)

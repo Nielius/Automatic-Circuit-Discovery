@@ -300,7 +300,7 @@ for i in range(args.max_num_epochs): # NUDB: these aren't really epochs, are the
         display(Image(f"ims/img_new_{i+1}.png"))
 
     print(i, "-" * 50)
-    print(exp.count_no_edges())
+    print(exp.count_num_edges())
 
     if i == 0:
         exp.save_edges("edges.pkl")
