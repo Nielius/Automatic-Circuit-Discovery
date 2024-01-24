@@ -93,9 +93,9 @@ def get_node_name(node: TLACDCInterpNode, show_full_index=True):
 
     return "<" + name + ">"
 
-def build_colorscheme(correspondence, colorscheme: str = "Pastel2", show_full_index=True) -> Dict[str, str]:
+def build_colorscheme(correspondence: TLACDCCorrespondence, colorscheme: str = "Pastel2", show_full_index=True) -> Dict[str, str]:
     colors = {}
-    for node in correspondence.nodes():
+    for node in correspondence.nodes_list():
         colors[get_node_name(node, show_full_index=show_full_index)] = generate_random_color(colorscheme)
     return colors
 
@@ -151,8 +151,8 @@ def show(
                 for parent_index in correspondence.edges[child_hook_name][child_index][parent_hook_name]:
                     edge = correspondence.edges[child_hook_name][child_index][parent_hook_name][parent_index]
 
-                    parent = correspondence.graph[parent_hook_name][parent_index]
-                    child = correspondence.graph[child_hook_name][child_index]
+                    parent = correspondence.nodes[parent_hook_name][parent_index]
+                    child = correspondence.nodes[child_hook_name][child_index]
 
                     parent_name = get_node_name(parent, show_full_index=show_full_index)
                     child_name = get_node_name(child, show_full_index=show_full_index)

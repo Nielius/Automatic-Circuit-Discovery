@@ -49,6 +49,8 @@ class TLACDCExperiment:
 
     Based off of ACDCExperiment from old rust_circuit code"""
 
+    corr: TLACDCCorrespondence
+
     def __init__(
         self,
         model: HookedTransformer,
@@ -206,6 +208,9 @@ class TLACDCExperiment:
         if initial:
             assert abs(self.cur_metric) < 1e-5, f"Metric {self.cur_metric=} is not zero"
 
+        self.log_current_metric_and_edges_to_wandb()
+
+    def log_current_metric_and_edges_to_wandb(self):
         if self.using_wandb:
             wandb_return_dict = {
                 "cur_metric": self.cur_metric,
@@ -227,17 +232,17 @@ class TLACDCExperiment:
         self.model.reset_hooks()
 
         if self.verbose:
-            print(self.corr.graph.keys())
+            print(self.corr.nodes.keys())
 
         cache_keys = list(cache.keys())
         cache_keys.reverse()
 
         for hook_name in cache_keys:
             print(hook_name)            
-            if hook_name in self.corr.graph:
-                new_graph[hook_name] = self.corr.graph[hook_name]
+            if hook_name in self.corr.nodes:
+                new_graph[hook_name] = self.corr.nodes[hook_name]
 
-        self.corr.graph = new_graph
+        self.corr.nodes = new_graph
 
     def sender_hook(self, z, hook, verbose=False, cache="online", device=None):
         """Hook that saves activations of a HookPoint to a cache
@@ -270,8 +275,8 @@ class TLACDCExperiment:
         Note that we add **one receiver_hook per HookPoint**
         So all the computation for a given HookPoint, for example all computations involving query inputs to layer 1 is managed by one receiver_hook 
         (because all layer 1 query inputs are contained in the `blocks.1.hook_q_input` hook)"""
-        
-        incoming_edge_types = [self.corr.graph[hook.name][receiver_index].incoming_edge_type for receiver_index in list(self.corr.edges[hook.name].keys())]
+
+        incoming_edge_types = [self.corr.nodes[hook.name][receiver_index].incoming_edge_type for receiver_index in list(self.corr.edges[hook.name].keys())]
 
         if verbose:
             print("In receiver hook", hook.name)
@@ -381,13 +386,13 @@ class TLACDCExperiment:
 
             if edge.edge_type == EdgeType.DIRECT_COMPUTATION:
                 if not skip_direct_computation:
-                    nodes.append(self.corr.graph[big_tuple[2]][big_tuple[3]])
+                    nodes.append(self.corr.nodes[big_tuple[2]][big_tuple[3]])
                     if add_all_hooks:
-                        nodes.append(self.corr.graph[big_tuple[0]][big_tuple[1]])
+                        nodes.append(self.corr.nodes[big_tuple[0]][big_tuple[1]])
             elif edge.edge_type == EdgeType.ADDITION:
-                nodes.append(self.corr.graph[big_tuple[2]][big_tuple[3]])
+                nodes.append(self.corr.nodes[big_tuple[2]][big_tuple[3]])
                 if add_all_hooks:
-                    nodes.append(self.corr.graph[big_tuple[0]][big_tuple[1]])
+                    nodes.append(self.corr.nodes[big_tuple[0]][big_tuple[1]])
             elif edge.edge_type != EdgeType.PLACEHOLDER:
                 print(edge.edge_type.value, EdgeType.ADDITION.value, edge.edge_type.value == EdgeType.ADDITION.value, type(edge.edge_type.value), type(EdgeType.ADDITION.value))
                 raise ValueError(f"{str(big_tuple)} {str(edge)} failed")
@@ -462,7 +467,7 @@ class TLACDCExperiment:
             if doing_acdc_runs:
                 warnings.warn("Deprecating adding receiver hooks before launching into ACDC runs, this may be totally broke. Ignore this warning if you are not doing ACDC runs")
 
-            receiver_node_names = list(set([node.name for node in self.corr.nodes() if node.incoming_edge_type != EdgeType.PLACEHOLDER]))
+            receiver_node_names = list(set([node.name for node in self.corr.nodes_list() if node.incoming_edge_type != EdgeType.PLACEHOLDER]))
             for receiver_name in receiver_node_names: # TODO could remove the nodes that don't have any parents...
                 self.model.add_hook(
                     name=receiver_name,
@@ -526,14 +531,14 @@ class TLACDCExperiment:
         start_step_time = time.time()
         self.step_idx += 1
 
-        self.update_cur_metric(recalc_metric=True, recalc_edges=True)
+        self.update_cur_metric(recalc_metric=True, recalc_edges=True)  # NUDB: calculate metric
         initial_metric = self.cur_metric
 
         cur_metric = initial_metric
         if self.verbose:
             print("New metric:", cur_metric)
 
-        if self.current_node.incoming_edge_type.value != EdgeType.PLACEHOLDER.value:
+        if self.current_node.incoming_edge_type.value != EdgeType.PLACEHOLDER.value:   # NUDB: add hooks; but why?
             self.add_receiver_hook(self.current_node, override=True, prepend=True)
 
         if self.current_node.incoming_edge_type.value == EdgeType.DIRECT_COMPUTATION.value:
@@ -546,7 +551,7 @@ class TLACDCExperiment:
 
         sender_names_list = list(self.corr.edges[self.current_node.name][self.current_node.index])
 
-        if self.names_mode == "random":
+        if self.names_mode == "random":  # NUDB: could be replaced by some kind of iterator
             random.shuffle(sender_names_list)
         elif self.names_mode == "reverse":
             sender_names_list = list(reversed(sender_names_list))
@@ -561,7 +566,7 @@ class TLACDCExperiment:
 
             for sender_index in sender_indices_list:
                 edge = self.corr.edges[self.current_node.name][self.current_node.index][sender_name][sender_index]
-                cur_parent = self.corr.graph[sender_name][sender_index]
+                cur_parent = self.corr.nodes[sender_name][sender_index]
 
                 if edge.edge_type == EdgeType.PLACEHOLDER:
                     is_this_node_used = True
@@ -573,12 +578,10 @@ class TLACDCExperiment:
                 edge.present = False
 
                 if edge.edge_type == EdgeType.ADDITION:
-                    added_sender_hook = self.add_sender_hook(
-                        cur_parent,
+                    self.add_sender_hook(
+                        cur_parent
                     )
-                else:
-                    added_sender_hook = False
-                
+
                 old_metric = self.cur_metric
                 if self.second_metric is not None:
                     old_second_metric = self.cur_second_metric
@@ -624,13 +627,12 @@ class TLACDCExperiment:
                         print("...so keeping connection")
                     edge.present = True
 
-                self.update_cur_metric(recalc_edges=False, recalc_metric=False) # So we log current state to wandb
-
                 if self.using_wandb:
+                    self.log_current_metric_and_edges_to_wandb()
                     log_metrics_to_wandb(
                         self,
                         current_metric = self.cur_metric,
-                        parent_name = str(self.corr.graph[sender_name][sender_index]),
+                        parent_name = str(self.corr.nodes[sender_name][sender_index]),
                         child_name = str(self.current_node),
                         result = result,
                         times = time.time(),
@@ -680,7 +682,7 @@ class TLACDCExperiment:
             cur_node = bfs[bfs_idx]
             bfs_idx += 1
 
-            children = self.corr.graph[cur_node.name][cur_node.index].children
+            children = self.corr.nodes[cur_node.name][cur_node.index].children
 
             for child_node in children:
                 if self.corr.edges[child_node.name][child_node.index][cur_node.name][cur_node.index].edge_type.value == EdgeType.PLACEHOLDER.value:
@@ -754,14 +756,14 @@ class TLACDCExperiment:
         return False
 
     def find_next_node(self) -> Optional[TLACDCInterpNode]:
-        next_index = next_key(self.corr.graph[self.current_node.name], self.current_node.index)
+        next_index = next_key(self.corr.nodes[self.current_node.name], self.current_node.index)
         if next_index is not None:
-            return self.corr.graph[self.current_node.name][next_index]
+            return self.corr.nodes[self.current_node.name][next_index]
 
-        next_name = next_key(self.corr.graph, self.current_node.name)
+        next_name = next_key(self.corr.nodes, self.current_node.name)
 
         if next_name is not None:
-            return list(self.corr.graph[next_name].values())[0]
+            return list(self.corr.nodes[next_name].values())[0]
             
         warnings.warn("Finished iterating")
         return None
@@ -805,6 +807,9 @@ class TLACDCExperiment:
             return ret
 
     def load_subgraph(self, subgraph: Subgraph):
+        """For every edge in 'subgraph',
+        mark the corresponding edge in the correspondence self.corr as present or not,
+        by setting its 'present' attribute to True or False, depending on what the subgraph says."""
 
         # assert formatting is correct
         set_of_edges = set()

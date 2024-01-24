@@ -14,18 +14,18 @@ class TLACDCCorrespondence:
     
     The two attributes, self.graph and self.edges allow for efficiently looking up the nodes and edges in the graph: see `notebooks/editing_edges.py`"""
 
-    graph: MutableMapping[str, MutableMapping[TorchIndex, TLACDCInterpNode]]
+    nodes: MutableMapping[str, MutableMapping[TorchIndex, TLACDCInterpNode]]
     edges: MutableMapping[str, MutableMapping[TorchIndex, MutableMapping[str, MutableMapping[TorchIndex, Edge]]]]
     def __init__(self):
-        self.graph = OrderedDefaultdict(OrderedDict) # TODO rename "nodes?"
+        self.nodes = OrderedDefaultdict(OrderedDict)
         self.edges = make_nd_dict(end_type=None, n=4)
 
     def first_node(self):
-        return self.graph[list(self.graph.keys())[0]][list(self.graph[list(self.graph.keys())[0]].keys())[0]]
+        return self.nodes[list(self.nodes.keys())[0]][list(self.nodes[list(self.nodes.keys())[0]].keys())[0]]
 
-    def nodes(self) -> List[TLACDCInterpNode]:
+    def nodes_list(self) -> List[TLACDCInterpNode]:
         """Concatenate all nodes in the graph"""
-        return [node for by_index_list in self.graph.values() for node in by_index_list.values()]
+        return [node for by_index_list in self.nodes.values() for node in by_index_list.values()]
     
     def all_edges(self) -> Dict[Tuple[str, TorchIndex, str, TorchIndex], Edge]:
         """Concatenate all edges in the graph"""
@@ -44,8 +44,8 @@ class TLACDCCorrespondence:
 
     def add_node(self, node: TLACDCInterpNode, safe=True):
         if safe:
-            assert node not in self.nodes(), f"Node {node} already in graph"
-        self.graph[node.name][node.index] = node
+            assert node not in self.nodes_list(), f"Node {node} already in graph"
+        self.nodes[node.name][node.index] = node
 
     def add_edge(
         self,
@@ -55,9 +55,9 @@ class TLACDCCorrespondence:
         safe=True,
     ):
         if safe:
-            if parent_node not in self.nodes(): # TODO could be slow ???
+            if parent_node not in self.nodes_list(): # TODO could be slow ???
                 self.add_node(parent_node)
-            if child_node not in self.nodes():
+            if child_node not in self.nodes_list():
                 self.add_node(child_node)
         
         assert child_node.incoming_edge_type == edge.edge_type, (child_node.incoming_edge_type, edge.edge_type)
@@ -91,14 +91,14 @@ class TLACDCCorrespondence:
         if len(self.edges[child_name]) == 0:
             del self.edges[child_name]
 
-        parent = self.graph[parent_name][parent_index]
-        child = self.graph[child_name][child_index]
+        parent = self.nodes[parent_name][parent_index]
+        child = self.nodes[child_name][child_index]
 
         parent.children.remove(child)
         child.parents.remove(parent)        
 
     @classmethod
-    def setup_from_model(cls, model, use_pos_embed=False):
+    def setup_from_model(cls, model, use_pos_embed=False) -> "TLACDCCorrespondence":
         correspondence = cls()
 
         downstream_residual_nodes: List[TLACDCInterpNode] = []
