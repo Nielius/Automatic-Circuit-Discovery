@@ -92,6 +92,7 @@ class GreaterThanConstants:
             self.YEARS.extend(all_success[1:-1])
             self.YEARS_BY_CENTURY[century] = all_success[1:-1]
 
+        # These are only the tokens of the years
         TOKENS = {
             i: _TOKENIZER.encode(f"{'0' if i<=9 else ''}{i}")[0] for i in range(0, 100)
         }
@@ -110,9 +111,11 @@ def greaterthan_metric_reference(logits, tokens):
     constants = GreaterThanConstants.get(logits.device)
 
     probs = F.softmax(logits[:, -1], dim=-1) # last elem???
+
     ans = 0.0
     for i in range(len(probs)):
-        yearend = constants.INV_TOKENS[tokens[i][7].item()]
+        # Calculate sum of probabilities for correct years, minus sum of probabilities of bad years
+        yearend = constants.INV_TOKENS[tokens[i][7].item()] # the 7th token is the original year
         for year_suff in range(yearend+1, 100):
             ans += probs[i, constants.TOKENS[year_suff]]
         for year_pref in range(0, yearend+1):
@@ -319,7 +322,7 @@ def get_greaterthan_true_edges(model):
         for mlp_sender_layer in range(0, layer_idx):
             corr.edges[f"blocks.{layer_idx}.hook_q_input"][TorchIndex([None, None, head_idx])][f"blocks.{mlp_sender_layer}.hook_mlp_out"][TorchIndex([None])].present = True
 
-    ret =  OrderedDict({(t[0], t[1].hashable_tuple, t[2], t[3].hashable_tuple): e.present for t, e in corr.all_edges().items() if e.present})
+    ret =  OrderedDict({(t[0], t[1].hashable_tuple, t[2], t[3].hashable_tuple): edge.present for t, edge in corr.all_edges().items() if edge.present})
     return ret
 
 

@@ -36,7 +36,7 @@ from subnetwork_probing.transformer_lens.transformer_lens.ioi_dataset import IOI
 import wandb
 
 
-def iterative_correspondence_from_mask(
+def iterative_correspondence_from_mask(  # Q NUDB: why is this an "iterative" correspondence?
     model: HookedTransformer,
     nodes_to_mask: List[TLACDCInterpNode], # Can be empty
     use_pos_embed: bool = False,
