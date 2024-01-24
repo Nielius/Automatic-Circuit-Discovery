@@ -47,7 +47,7 @@ torch.autograd.set_grad_enabled(False)
 # This is still usable in notebooks! We can pass a string to the parser, see below.
 # We'll reproduce </p>
 
-#%%
+# %%
 parser = argparse.ArgumentParser(description="Used to launch ACDC runs. Only task and threshold are required")
 
 
@@ -145,10 +145,10 @@ DEVICE = args.device
 RESET_NETWORK = args.reset_network
 SINGLE_STEP = True if args.single_step else False
 
-#%% [markdown]
+# %% [markdown]
 # <h2>Setup Task</h2>
 
-#%%
+# %%
 
 second_metric = None  # some tasks only have one metric
 use_pos_embed = TASK.startswith("tracr")
@@ -203,10 +203,10 @@ else:
     raise ValueError(f"Unknown task {TASK}")
 
 
-#%% [markdown]
+# %% [markdown]
 # <p> Let's define the four most important objects for ACDC experiments:
 
-#%%
+# %%
 
 validation_metric = things.validation_metric  # metric we use (e.g KL divergence)
 toks_int_values = things.validation_data  # clean data x_i
@@ -216,10 +216,10 @@ tl_model = things.tl_model  # transformerlens model
 if RESET_NETWORK:
     reset_network(TASK, DEVICE, tl_model)
 
-#%% [markdown]
+# %% [markdown]
 # <h2>Setup ACDC Experiment</h2>
 
-#%%
+# %%
 # Make notes for potential wandb run
 try:
     with open(__file__, "r") as f:
@@ -280,13 +280,15 @@ exp = TLACDCExperiment(
 # <h2>Run steps of ACDC: iterate over a NODE in the model's computational graph</h2>
 # <p>WARNING! This will take a few minutes to run, but there should be rolling nice pictures too : )</p>
 
-#%%
+# %%
 
 
 exp_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
-for i in range(args.max_num_epochs): # NUDB: these aren't really epochs, are they? they are just "steps" where you look at a single node
+for i in range(
+    args.max_num_epochs
+):  # NUDB: these aren't really epochs, are they? they are just "steps" where you look at a single node
     exp.step(testing=False)
 
     show(
@@ -329,7 +331,7 @@ if USING_WANDB:
 # <p>Also note that the final image has more than 12 edges, because the edges from a0.0_q and a0.0_k are not connected to the input</p>
 # <p>We recover minimal induction machinery! `embed -> a0.0_v -> a1.6k`</p>
 
-#%%
+# %%
 exp.save_subgraph(
     return_it=True,
 )

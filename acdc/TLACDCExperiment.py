@@ -289,7 +289,6 @@ class TLACDCExperiment:
             print("In receiver hook", hook.name)
 
         if EdgeType.DIRECT_COMPUTATION in incoming_edge_types:
-
             old_z = hook_point_input.clone()
             hook_point_input[:] = self.global_cache.corrupted_cache[hook.name].to(
                 hook_point_input.device
@@ -352,7 +351,6 @@ class TLACDCExperiment:
         for receiver_node_index in self.corr.edges[hook.name]:
             for sender_node_name in self.corr.edges[hook.name][receiver_node_index]:
                 for sender_node_index in self.corr.edges[hook.name][receiver_node_index][sender_node_name]:
-
                     edge = self.corr.edges[hook.name][receiver_node_index][sender_node_name][
                         sender_node_index
                     ]  # TODO maybe less crazy nested indexes ... just make local variables each time?
@@ -806,7 +804,6 @@ class TLACDCExperiment:
         parent_names = list(self.corr.edges[self.current_node.name][self.current_node.index].keys())
 
         for parent_name in parent_names:
-
             try:
                 rest1 = self.corr.edges[self.current_node.name][self.current_node.index][parent_name]
             except KeyError:
@@ -978,11 +975,10 @@ class TLACDCExperiment:
                         edge.present = False
 
     def add_back_head(self, layer_idx, head_idx):
-
         raise NotImplementedError("This is wrong do not use")
 
         all_edges = self.corr.all_edges()
-        for (tupl, edge) in all_edges.items():
+        for tupl, edge in all_edges.items():
             for hook_name, hook_idx in [(tupl[0], tupl[1]), (tupl[2], tupl[3])]:
                 if (
                     hook_name.startswith(f"blocks.{layer_idx}")

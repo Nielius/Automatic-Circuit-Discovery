@@ -8,24 +8,27 @@
 # <h3>Setup:</h3>
 # <p>Janky code to do different setup when run in a Colab notebook vs VSCode (adapted from e.g <a href="https://github.com/neelnanda-io/TransformerLens/blob/5c89b7583e73ce96db5e46ef86a14b15f303dde6/demos/Activation_Patching_in_TL_Demo.ipynb">this notebook</a>)</p>
 
-#%%
+# %%
 try:
     import google.colab
 
     IN_COLAB = True
     print("Running as a Colab notebook")
 
-    import subprocess # to install graphviz dependencies
-    command = ['apt-get', 'install', 'graphviz-dev']
+    import subprocess  # to install graphviz dependencies
+
+    command = ["apt-get", "install", "graphviz-dev"]
     subprocess.run(command, check=True)
 
-    import os # make images folder
+    import os  # make images folder
+
     os.mkdir("ims/")
 
     from IPython import get_ipython
+
     ipython = get_ipython()
 
-    ipython.run_line_magic( # install ACDC
+    ipython.run_line_magic(  # install ACDC
         "pip",
         "install git+https://github.com/ArthurConmy/Automatic-Circuit-Discovery.git@d89f7fa9cbd095202f3940c889cb7c6bf5a9b516",
     )
@@ -34,13 +37,14 @@ except Exception as e:
     IN_COLAB = False
     print("Running outside of colab")
 
-    import numpy # crucial to not get cursed error
+    import numpy  # crucial to not get cursed error
     import plotly
 
     plotly.io.renderers.default = "colab"  # added by Arthur so running as a .py notebook with #%% generates .ipynb notebooks that display in colab
     # disable this option when developing rather than generating notebook outputs
 
-    import os # make images folder
+    import os  # make images folder
+
     if not os.path.exists("ims/"):
         os.mkdir("ims/")
 
@@ -57,7 +61,7 @@ except Exception as e:
 # %% [markdown]
 # <h2>Imports etc</h2>
 
-#%%
+# %%
 import wandb
 import IPython
 from IPython.display import Image, display
@@ -88,6 +92,7 @@ from transformer_lens.hook_points import HookedRootModule, HookPoint
 from transformer_lens.HookedTransformer import (
     HookedTransformer,
 )
+
 try:
     from acdc.tracr_task.utils import (
         get_all_tracr_things,
@@ -127,10 +132,7 @@ from acdc.induction.utils import (
 )
 from acdc.greaterthan.utils import get_all_greaterthan_things
 
-from acdc.acdc_graphics import (
-    build_colorscheme,
-    show
-)
+from acdc.acdc_graphics import build_colorscheme, show
 import argparse
 
 torch.autograd.set_grad_enabled(False)
@@ -141,45 +143,81 @@ torch.autograd.set_grad_enabled(False)
 # This is still usable in notebooks! We can pass a string to the parser, see below.
 # We'll reproduce </p>
 
-#%%
+# %%
 parser = argparse.ArgumentParser(description="Used to launch ACDC runs. Only task and threshold are required")
 
 
-task_choices = ['ioi', 'docstring', 'induction', 'tracr-reverse', 'tracr-proportion', 'greaterthan', 'or_gate']
-parser.add_argument('--task', type=str, required=True, choices=task_choices, help=f'Choose a task from the available options: {task_choices}')
-parser.add_argument('--threshold', type=float, required=True, help='Value for THRESHOLD')
-parser.add_argument('--first-cache-cpu', type=str, required=False, default="True", help='Value for FIRST_CACHE_CPU (the old name for the `online_cache`)')
-parser.add_argument('--second-cache-cpu', type=str, required=False, default="True", help='Value for SECOND_CACHE_CPU (the old name for the `corrupted_cache`)')
-parser.add_argument('--zero-ablation', action='store_true', help='Use zero ablation')
-parser.add_argument('--using-wandb', action='store_true', help='Use wandb')
-parser.add_argument('--wandb-entity-name', type=str, required=False, default="remix_school-of-rock", help='Value for WANDB_ENTITY_NAME')
-parser.add_argument('--wandb-group-name', type=str, required=False, default="default", help='Value for WANDB_GROUP_NAME')
-parser.add_argument('--wandb-project-name', type=str, required=False, default="acdc", help='Value for WANDB_PROJECT_NAME')
-parser.add_argument('--wandb-run-name', type=str, required=False, default=None, help='Value for WANDB_RUN_NAME')
+task_choices = ["ioi", "docstring", "induction", "tracr-reverse", "tracr-proportion", "greaterthan", "or_gate"]
+parser.add_argument(
+    "--task",
+    type=str,
+    required=True,
+    choices=task_choices,
+    help=f"Choose a task from the available options: {task_choices}",
+)
+parser.add_argument("--threshold", type=float, required=True, help="Value for THRESHOLD")
+parser.add_argument(
+    "--first-cache-cpu",
+    type=str,
+    required=False,
+    default="True",
+    help="Value for FIRST_CACHE_CPU (the old name for the `online_cache`)",
+)
+parser.add_argument(
+    "--second-cache-cpu",
+    type=str,
+    required=False,
+    default="True",
+    help="Value for SECOND_CACHE_CPU (the old name for the `corrupted_cache`)",
+)
+parser.add_argument("--zero-ablation", action="store_true", help="Use zero ablation")
+parser.add_argument("--using-wandb", action="store_true", help="Use wandb")
+parser.add_argument(
+    "--wandb-entity-name", type=str, required=False, default="remix_school-of-rock", help="Value for WANDB_ENTITY_NAME"
+)
+parser.add_argument(
+    "--wandb-group-name", type=str, required=False, default="default", help="Value for WANDB_GROUP_NAME"
+)
+parser.add_argument(
+    "--wandb-project-name", type=str, required=False, default="acdc", help="Value for WANDB_PROJECT_NAME"
+)
+parser.add_argument("--wandb-run-name", type=str, required=False, default=None, help="Value for WANDB_RUN_NAME")
 parser.add_argument("--wandb-dir", type=str, default="/tmp/wandb")
 parser.add_argument("--wandb-mode", type=str, default="online")
-parser.add_argument('--indices-mode', type=str, default="normal")
-parser.add_argument('--names-mode', type=str, default="normal")
-parser.add_argument('--device', type=str, default="cuda")
-parser.add_argument('--reset-network', type=int, default=0, help="Whether to reset the network we're operating on before running interp on it")
-parser.add_argument('--metric', type=str, default="kl_div", help="Which metric to use for the experiment")
-parser.add_argument('--torch-num-threads', type=int, default=0, help="How many threads to use for torch (0=all)")
-parser.add_argument('--seed', type=int, default=1234)
-parser.add_argument("--max-num-epochs",type=int, default=100_000)
-parser.add_argument('--single-step', action='store_true', help='Use single step, mostly for testing')
-parser.add_argument("--abs-value-threshold", action='store_true', help='Use the absolute value of the result to check threshold')
+parser.add_argument("--indices-mode", type=str, default="normal")
+parser.add_argument("--names-mode", type=str, default="normal")
+parser.add_argument("--device", type=str, default="cuda")
+parser.add_argument(
+    "--reset-network",
+    type=int,
+    default=0,
+    help="Whether to reset the network we're operating on before running interp on it",
+)
+parser.add_argument("--metric", type=str, default="kl_div", help="Which metric to use for the experiment")
+parser.add_argument("--torch-num-threads", type=int, default=0, help="How many threads to use for torch (0=all)")
+parser.add_argument("--seed", type=int, default=1234)
+parser.add_argument("--max-num-epochs", type=int, default=100_000)
+parser.add_argument("--single-step", action="store_true", help="Use single step, mostly for testing")
+parser.add_argument(
+    "--abs-value-threshold", action="store_true", help="Use the absolute value of the result to check threshold"
+)
 
 if ipython is not None:
     # We are in a notebook
     # you can put the command you would like to run as the ... in r"""..."""
     args = parser.parse_args(
-        [line.strip() for line in r"""--task=induction\
+        [
+            line.strip()
+            for line in r"""--task=induction\
 --zero-ablation\
 --threshold=0.71\
 --indices-mode=reverse\
 --first-cache-cpu=False\
 --second-cache-cpu=False\
---max-num-epochs=100000""".split("\\\n")]
+--max-num-epochs=100000""".split(
+                "\\\n"
+            )
+        ]
     )
 else:
     # read from command line
@@ -192,13 +230,13 @@ if args.torch_num_threads > 0:
 torch.manual_seed(args.seed)
 
 TASK = args.task
-if args.first_cache_cpu is None: # manage default
+if args.first_cache_cpu is None:  # manage default
     ONLINE_CACHE_CPU = True
 elif args.first_cache_cpu.lower() == "false":
     ONLINE_CACHE_CPU = False
 elif args.first_cache_cpu.lower() == "true":
     ONLINE_CACHE_CPU = True
-else: 
+else:
     raise ValueError(f"first_cache_cpu must be either True or False, got {args.first_cache_cpu}")
 if args.second_cache_cpu is None:
     CORRUPTED_CACHE_CPU = True
@@ -221,19 +259,17 @@ DEVICE = args.device
 RESET_NETWORK = args.reset_network
 SINGLE_STEP = True if args.single_step else False
 
-#%% [markdown] 
+# %% [markdown]
 # <h2>Setup Task</h2>
 
-#%%
+# %%
 
 second_metric = None  # some tasks only have one metric
 use_pos_embed = TASK.startswith("tracr")
 
 if TASK == "ioi":
     num_examples = 100
-    things = get_all_ioi_things(
-        num_examples=num_examples, device=DEVICE, metric_name=args.metric
-    )
+    things = get_all_ioi_things(num_examples=num_examples, device=DEVICE, metric_name=args.metric)
 elif TASK == "or_gate":
     num_examples = 1
     seq_len = 1
@@ -263,9 +299,7 @@ elif TASK == "tracr-proportion":
 elif TASK == "induction":
     num_examples = 10 if IN_COLAB else 50
     seq_len = 300
-    things = get_all_induction_things(
-        num_examples=num_examples, seq_len=seq_len, device=DEVICE, metric=args.metric
-    )
+    things = get_all_induction_things(num_examples=num_examples, seq_len=seq_len, device=DEVICE, metric=args.metric)
 elif TASK == "docstring":
     num_examples = 50
     seq_len = 41
@@ -278,30 +312,28 @@ elif TASK == "docstring":
     )
 elif TASK == "greaterthan":
     num_examples = 100
-    things = get_all_greaterthan_things(
-        num_examples=num_examples, metric_name=args.metric, device=DEVICE
-    )
+    things = get_all_greaterthan_things(num_examples=num_examples, metric_name=args.metric, device=DEVICE)
 else:
     raise ValueError(f"Unknown task {TASK}")
 
 
-#%% [markdown]
+# %% [markdown]
 # <p> Let's define the four most important objects for ACDC experiments:
 
-#%%
+# %%
 
-validation_metric = things.validation_metric # metric we use (e.g KL divergence)
-toks_int_values = things.validation_data # clean data x_i
-toks_int_values_other = things.validation_patch_data # corrupted data x_i'
-tl_model = things.tl_model # transformerlens model
+validation_metric = things.validation_metric  # metric we use (e.g KL divergence)
+toks_int_values = things.validation_data  # clean data x_i
+toks_int_values_other = things.validation_patch_data  # corrupted data x_i'
+tl_model = things.tl_model  # transformerlens model
 
 if RESET_NETWORK:
     reset_network(TASK, DEVICE, tl_model)
 
-#%% [markdown]
+# %% [markdown]
 # <h2>Setup ACDC Experiment</h2>
 
-#%%
+# %%
 # Make notes for potential wandb run
 try:
     with open(__file__, "r") as f:
@@ -317,7 +349,9 @@ torch.cuda.empty_cache()
 
 # Setup wandb if needed
 if WANDB_RUN_NAME is None or IPython.get_ipython() is not None:
-    WANDB_RUN_NAME = f"{ct()}{'_randomindices' if INDICES_MODE=='random' else ''}_{THRESHOLD}{'_zero' if ZERO_ABLATION else ''}"
+    WANDB_RUN_NAME = (
+        f"{ct()}{'_randomindices' if INDICES_MODE=='random' else ''}_{THRESHOLD}{'_zero' if ZERO_ABLATION else ''}"
+    )
 else:
     assert WANDB_RUN_NAME is not None, "I want named runs, always"
 
@@ -357,9 +391,10 @@ exp = TLACDCExperiment(
 # <h2>Run steps of ACDC: iterate over a NODE in the model's computational graph</h2>
 # <p>WARNING! This will take a few minutes to run, but there should be rolling nice pictures too : )</p>
 
-#%%
+# %%
 
 import datetime
+
 exp_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 for i in range(args.max_num_epochs):
@@ -385,7 +420,6 @@ for i in range(args.max_num_epochs):
         show(
             exp.corr,
             f"ims/ACDC_img_{exp_time}.png",
-
         )
         break
 
@@ -406,7 +440,7 @@ if USING_WANDB:
 # <p>Also note that the final image has more than 12 edges, because the edges from a0.0_q and a0.0_k are not connected to the input</p>
 # <p>We recover minimal induction machinery! `embed -> a0.0_v -> a1.6k`</p>
 
-#%%
+# %%
 exp.save_subgraph(
     return_it=True,
 )

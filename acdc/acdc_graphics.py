@@ -23,10 +23,11 @@ import pygraphviz as pgv
 from pathlib import Path
 
 EDGE_TYPE_COLORS = {
-    EdgeType.ADDITION.value: "#FF0000", # Red
-    EdgeType.DIRECT_COMPUTATION.value: "#00FF00", # Green
-    EdgeType.PLACEHOLDER.value: "#0000FF", # Blue
+    EdgeType.ADDITION.value: "#FF0000",  # Red
+    EdgeType.DIRECT_COMPUTATION.value: "#00FF00",  # Green
+    EdgeType.PLACEHOLDER.value: "#0000FF",  # Blue
 }
+
 
 def generate_random_color(colorscheme: str) -> str:
     """
@@ -41,6 +42,7 @@ def generate_random_color(colorscheme: str) -> str:
         return "#{:02x}{:02x}{:02x}".format(rgb[0], rgb[1], rgb[2])
 
     return rgb2hex(cmapy.color("Pastel2", np.random.randint(0, 256), rgb_order=True))
+
 
 def get_node_name(node: TLACDCInterpNode, show_full_index=True):
     """Node name for use in pretty graphs"""
@@ -88,12 +90,14 @@ def get_node_name(node: TLACDCInterpNode, show_full_index=True):
             raise ValueError(f"Unrecognized node name {node.name}")
 
     else:
-        
         name = node.name + str(node.index.graphviz_index(use_actual_colon=True))
 
     return "<" + name + ">"
 
-def build_colorscheme(correspondence: TLACDCCorrespondence, colorscheme: str = "Pastel2", show_full_index=True) -> Dict[str, str]:
+
+def build_colorscheme(
+    correspondence: TLACDCCorrespondence, colorscheme: str = "Pastel2", show_full_index=True
+) -> Dict[str, str]:
     colors = {}
     for node in correspondence.nodes_list():
         colors[get_node_name(node, show_full_index=show_full_index)] = generate_random_color(colorscheme)
@@ -108,10 +112,10 @@ def show(
     show_full_index: bool = True,
     remove_self_loops: bool = True,
     remove_qkv: bool = False,
-    layout: str="dot",
+    layout: str = "dot",
     edge_type_colouring: bool = False,
     show_placeholders: bool = False,
-    seed: Optional[int] = None
+    seed: Optional[int] = None,
 ) -> pgv.AGraph:
     """
     Colorscheme: a color for each node name, or a string corresponding to a cmapy color scheme
@@ -165,7 +169,9 @@ def show(
                         # Important this go after the qkv removal
                         continue
 
-                    if (edge.present and edge.effect_size is not None) and (edge.edge_type != EdgeType.PLACEHOLDER or show_placeholders):
+                    if (edge.present and edge.effect_size is not None) and (
+                        edge.edge_type != EdgeType.PLACEHOLDER or show_placeholders
+                    ):
                         for node_name in [parent_name, child_name]:
                             maybe_pos = {}
                             if node_name in node_pos:
@@ -179,12 +185,14 @@ def show(
                                 fontname="Helvetica",
                                 **maybe_pos,
                             )
-                        
+
                         g.add_edge(
                             parent_name,
                             child_name,
                             penwidth=str(max(minimum_penwidth, edge.effect_size) * 2),
-                            color=colors[parent_name] if not edge_type_colouring else EDGE_TYPE_COLORS[edge.edge_type.value],
+                            color=colors[parent_name]
+                            if not edge_type_colouring
+                            else EDGE_TYPE_COLORS[edge.edge_type.value],
                         )
 
     if fname is not None:
@@ -207,34 +215,38 @@ def show(
 
         g.write(path=base_fname + ".gv")
 
-        if not fname.endswith(".gv"): # turn the .gv file into a .png file
+        if not fname.endswith(".gv"):  # turn the .gv file into a .png file
             g.draw(path=fname, prog="dot")
 
     return g
+
 
 # -------------------------------------------
 # WANDB
 # -------------------------------------------
 
-def do_plotly_plot_and_log(
-    experiment, x: List[int], y: List[float], plot_name: str, metadata: Optional[List[str]] = None,
-) -> None:
 
+def do_plotly_plot_and_log(
+    experiment,
+    x: List[int],
+    y: List[float],
+    plot_name: str,
+    metadata: Optional[List[str]] = None,
+) -> None:
     # Create a plotly plot with metadata
-    fig = go.Figure(
-        data=[go.Scatter(x=x, y=y, mode="lines+markers", text=metadata)]
-    )
+    fig = go.Figure(data=[go.Scatter(x=x, y=y, mode="lines+markers", text=metadata)])
     wandb.log({plot_name: fig})
+
 
 def log_metrics_to_wandb(
     experiment,
     current_metric: Optional[float] = None,
-    parent_name = None,
-    child_name = None,
-    evaluated_metric = None,
-    result = None,
-    picture_fname = None,
-    times = None,
+    parent_name=None,
+    child_name=None,
+    evaluated_metric=None,
+    result=None,
+    picture_fname=None,
+    times=None,
 ) -> None:
     """Arthur added Nones so that just some of the metrics can be plotted"""
 
@@ -254,8 +266,10 @@ def log_metrics_to_wandb(
         experiment.metrics_to_plot["num_edges"].append(experiment.count_num_edges())
     if times is not None:
         experiment.metrics_to_plot["times"].append(times)
-        experiment.metrics_to_plot["times_diff"].append( # hopefully fixes
-            0 if len(experiment.metrics_to_plot["times"]) == 1 else (experiment.metrics_to_plot["times"][-1] - experiment.metrics_to_plot["times"][-2])
+        experiment.metrics_to_plot["times_diff"].append(  # hopefully fixes
+            0
+            if len(experiment.metrics_to_plot["times"]) == 1
+            else (experiment.metrics_to_plot["times"][-1] - experiment.metrics_to_plot["times"][-2])
         )
 
     experiment.metrics_to_plot["acdc_step"] += 1
@@ -303,17 +317,22 @@ def log_metrics_to_wandb(
 
         if picture_fname is not None:  # presumably this is more expensive_update_cur
             wandb.log(
-                {"acdc_graph": wandb.Image(picture_fname),}
+                {
+                    "acdc_graph": wandb.Image(picture_fname),
+                }
             )
+
 
 # -------------------------------------------
 # utilities for ROC and AUC
 # -------------------------------------------
 
+
 def pessimistic_auc(xs, ys):
-    
     # Sort indices based on 'x' and 'y'
-    i = np.lexsort((ys, xs)) # lexsort sorts by the last column first, then the second last, etc., i.e we firstly sort by x and then y to break ties
+    i = np.lexsort(
+        (ys, xs)
+    )  # lexsort sorts by the last column first, then the second last, etc., i.e we firstly sort by x and then y to break ties
 
     xs = np.array(xs, dtype=np.float64)[i]
     ys = np.array(ys, dtype=np.float64)[i]
@@ -326,14 +345,16 @@ def pessimistic_auc(xs, ys):
     area = np.sum((1 - xs)[1:] * dys)
     return area
 
+
 assert pessimistic_auc([0, 1], [0, 1]) == 0.0
 assert pessimistic_auc([0, 0.5, 1], [0, 0.5, 1]) == 0.5**2
-assert pessimistic_auc([0, 0.25, 1], [0, 0.25, 1]) == .25 * .75
-assert pessimistic_auc([0, 0.25, 0.5, 1], [0, 0.25, 0.5, 1]) == 5/16
-assert pessimistic_auc([0, 0.25, 0.75, 1], [0, 0.25, 0.5, 1]) == 4/16
+assert pessimistic_auc([0, 0.25, 1], [0, 0.25, 1]) == 0.25 * 0.75
+assert pessimistic_auc([0, 0.25, 0.5, 1], [0, 0.25, 0.5, 1]) == 5 / 16
+assert pessimistic_auc([0, 0.25, 0.75, 1], [0, 0.25, 0.5, 1]) == 4 / 16
+
 
 def dict_merge(dct, merge_dct):
-    """ Recursive dict merge. Inspired by :meth:``dict.update()``, instead of
+    """Recursive dict merge. Inspired by :meth:``dict.update()``, instead of
     updating only top-level keys, dict_merge recurses down into dicts nested
     to an arbitrary depth, updating keys. The ``merge_dct`` is merged into
     ``dct``.
@@ -345,7 +366,7 @@ def dict_merge(dct, merge_dct):
     :return: None
     """
     for k in merge_dct.keys():
-        if (k in dct and isinstance(dct[k], dict) and isinstance(merge_dct[k], dict)):  #noqa
+        if k in dct and isinstance(dct[k], dict) and isinstance(merge_dct[k], dict):  # noqa
             dict_merge(dct[k], merge_dct[k])
         else:
             dct[k] = merge_dct[k]

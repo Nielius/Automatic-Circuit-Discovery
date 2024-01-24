@@ -6,30 +6,31 @@ from typing import Optional, List, TypeAlias
 
 class EdgeType(Enum):
     """
-    Property of edges in the computational graph - either 
-    
+    Property of edges in the computational graph - either
+
     ADDITION: the child (hook_name, index) is a sum of the parent (hook_name, index)s
     DIRECT_COMPUTATION The *single* child is a function of and only of the parent (e.g the value hooked by hook_q is a function of what hook_q_input saves).
     PLACEHOLDER generally like 2. but where there are generally multiple parents. Here in ACDC we just include these edges by default when we find them. Explained below?
-    
+
     Q: Why do we do this?
 
     There are two answers to this question: A1 is an interactive notebook, see <a href="https://colab.research.google.com/github/ArthurConmy/Automatic-Circuit-Discovery/blob/main/notebooks/colabs/ACDC_Editing_Edges_Demo.ipynb">this Colab notebook</a>, which is in this repo at notebooks/implementation_demo.py. A2 is an answer that is written here below, but probably not as clear as A1 (though shorter).
 
     A2: We need something inside TransformerLens to represent the edges of a computational graph.
-    The object we choose is pairs (hook_name, index). For example the output of Layer 11 Heads is a hook (blocks.11.attn.hook_result) and to sepcify the 3rd head we add the index [:, :, 3]. Then we can build a computational graph on these! 
+    The object we choose is pairs (hook_name, index). For example the output of Layer 11 Heads is a hook (blocks.11.attn.hook_result) and to sepcify the 3rd head we add the index [:, :, 3]. Then we can build a computational graph on these!
 
-    However, when we do ACDC there turn out to be two conflicting things "removing edges" wants to do: 
-    i) for things in the residual stream, we want to remove the sum of the effects from previous hooks 
-    ii) for things that are not linear we want to *recompute* e.g the result inside the hook 
+    However, when we do ACDC there turn out to be two conflicting things "removing edges" wants to do:
+    i) for things in the residual stream, we want to remove the sum of the effects from previous hooks
+    ii) for things that are not linear we want to *recompute* e.g the result inside the hook
     blocks.11.attn.hook_result from a corrupted Q and normal K and V
 
-    The easiest way I thought of of reconciling these different cases, while also having a connected computational graph, is to have three types of edges: addition for the residual case, direct computation for easy cases where we can just replace hook_q with a cached value when we e.g cut it off from hook_q_input, and placeholder to make the graph connected (when hook_result is connected to hook_q and hook_k and hook_v)"""
+    The easiest way I thought of of reconciling these different cases, while also having a connected computational graph, is to have three types of edges: addition for the residual case, direct computation for easy cases where we can just replace hook_q with a cached value when we e.g cut it off from hook_q_input, and placeholder to make the graph connected (when hook_result is connected to hook_q and hook_k and hook_v)
+    """
 
     ADDITION = 0
     DIRECT_COMPUTATION = 1
     PLACEHOLDER = 2
-    
+
     def __eq__(self, other):
         """Necessary because of extremely frustrating error that arises with load_ext autoreload (because this uses importlib under the hood: https://stackoverflow.com/questions/66458864/enum-comparison-become-false-after-reloading-module)"""
 
@@ -54,21 +55,23 @@ class Edge:
 
 HookPointName: TypeAlias = str
 
+
 class TorchIndex:
-    """There is not a clean bijection between things we 
+    """There is not a clean bijection between things we
     want in the computational graph, and things that are hooked
     (e.g hook_result covers all heads in a layer)
-    
-    `TorchIndex`s are essentially indices that say which part of the tensor is being affected. 
 
-    EXAMPLES: Initialise [:, :, 3] with TorchIndex([None, None, 3]) and [:] with TorchIndex([None])    
+    `TorchIndex`s are essentially indices that say which part of the tensor is being affected.
+
+    EXAMPLES: Initialise [:, :, 3] with TorchIndex([None, None, 3]) and [:] with TorchIndex([None])
 
     Also we want to be able to call e.g `my_dictionary[my_torch_index]` hence the hashable tuple stuff
-    
-    Note: ideally this would be integrated with transformer_lens.utils.Slice in future; they are accomplishing similar but different things"""
+
+    Note: ideally this would be integrated with transformer_lens.utils.Slice in future; they are accomplishing similar but different things
+    """
 
     def __init__(
-        self, 
+        self,
         list_of_things_in_tuple: List,
     ):
         # check correct types
@@ -93,7 +96,11 @@ class TorchIndex:
 
     # some graphics things
 
-    def __repr__(self, use_actual_colon=True) -> str: # graphviz, an old library used to dislike actual colons in strings, but this shouldn't be an issue anymore
+    def __repr__(
+        self, use_actual_colon=True
+    ) -> (
+        str
+    ):  # graphviz, an old library used to dislike actual colons in strings, but this shouldn't be an issue anymore
         ret = "["
         for idx, x in enumerate(self.hashable_tuple):
             if idx > 0:

@@ -36,6 +36,7 @@ pytest-cov = "^4.0.0"
 jupyterlab = "^3.5.0"
 jupyter = "^1.0.0"
 pyright = "^1.1.348"
+black = "^23.12.1"
 
 [build-system]
 requires = ["poetry-core"]
@@ -52,7 +53,9 @@ markers = [
 ]
 
 [tool.black]
+# See https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#configuration-format
 line-length = 120
+extend-exclude = 'subnetwork_probing/'
 
 [tool.isort]
 profile = "black"
