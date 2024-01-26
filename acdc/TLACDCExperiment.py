@@ -96,6 +96,9 @@ class TLACDCExperiment:
             However, a dead edge in the zero ablation cases outputs a non-zero output! (That is usually computed from zero inputs)"
             )
 
+        if skip_edges != "no":
+            warnings.warn("Never skipping edges, for now")
+
         model.reset_hooks()
 
         self.remove_redundant = remove_redundant
@@ -116,11 +119,12 @@ class TLACDCExperiment:
         self.step_idx = 0
         self.hook_verbose = hook_verbose
         self.skip_edges = skip_edges
-
-        if skip_edges != "no":
-            warnings.warn("Never skipping edges, for now")
-
         self.corr = TLACDCCorrespondence.setup_from_model(self.model, use_pos_embed=use_pos_embed)
+
+        self.ds = ds
+        self.ref_ds = ref_ds
+        self.online_cache_cpu = online_cache_cpu
+        self.corrupted_cache_cpu = corrupted_cache_cpu
 
         if early_exit:
             return
@@ -128,11 +132,6 @@ class TLACDCExperiment:
         self.reverse_topologically_sort_corr()
         self.current_node = self.corr.first_node()
         print(f"{self.current_node=}")
-
-        self.ds = ds
-        self.ref_ds = ref_ds
-        self.online_cache_cpu = online_cache_cpu
-        self.corrupted_cache_cpu = corrupted_cache_cpu
 
         if zero_ablation:
             if self.ref_ds is None:
@@ -608,7 +607,7 @@ class TLACDCExperiment:
         if self.verbose:
             print("New metric:", cur_metric)
 
-        if self.current_node.incoming_edge_type.value != EdgeType.PLACEHOLDER.value:  # NUDB: add hooks; but why?
+        if self.current_node.incoming_edge_type.value != EdgeType.PLACEHOLDER.value:
             self.add_receiver_hook(self.current_node, override=True, prepend=True)
 
         if self.current_node.incoming_edge_type.value == EdgeType.DIRECT_COMPUTATION.value:
