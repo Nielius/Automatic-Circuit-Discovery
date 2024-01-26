@@ -1714,6 +1714,17 @@ numpy = ">=1.19.5"
 jax = ["jax (>=0.2.20)", "jaxlib (>=0.1.71)"]
 
 [[package]]
+name = "joblib"
+version = "1.3.2"
+description = "Lightweight pipelining with Python functions"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "joblib-1.3.2-py3-none-any.whl", hash = "sha256:ef4331c65f239985f3f2220ecc87db222f08fd22097a3dd5698f693875f8cbb9"},
+    {file = "joblib-1.3.2.tar.gz", hash = "sha256:92f865e621e17784e7955080b6d042489e3b8e294949cc44c6eac304f59772b1"},
+]
+
+[[package]]
 name = "json5"
 version = "0.9.14"
 description = "A Python implementation of the JSON5 data format."
@@ -5332,4 +5343,4 @@ test = ["mypy", "pre-commit", "pytest", "pytest-asyncio", "websockets (>=10.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "714654386ffec77c1e52150688d8452f198e306315d873817f34efadb487794b"
+content-hash = "2f8e82221126233e0a6f2875da8a699f60c642fd42b4b545127663be22d2c3ce"
