@@ -54,7 +54,7 @@ from acdc.acdc_utils import (
 )
 from acdc.TLACDCEdge import (
     TorchIndex,
-    Edge,
+    EdgeInfo,
     EdgeType,
 )
 

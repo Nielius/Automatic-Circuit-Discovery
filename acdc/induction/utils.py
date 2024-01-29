@@ -30,7 +30,7 @@ from acdc.acdc_utils import (
 
 from acdc.TLACDCEdge import (
     TorchIndex,
-    Edge,
+    EdgeInfo,
     EdgeType,
 )  # these introduce several important classes !!!
 from transformer_lens import HookedTransformer

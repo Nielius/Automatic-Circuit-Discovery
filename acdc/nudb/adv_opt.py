@@ -8,6 +8,7 @@ from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 
 from acdc.TLACDCCorrespondence import TLACDCCorrespondence
+from acdc.acdc_graphics import graph_from_edges
 from acdc.docstring.utils import AllDataThings
 from acdc.greaterthan.utils import get_greaterthan_true_edges, get_all_greaterthan_things
 from acdc.nudb.joblib_caching import joblib_memory
@@ -71,17 +72,16 @@ class AblationRunner:
             self.model, True if self.model.cfg.positional_embedding_type == "standard" else NotImplementedError()
         )
 
-        list(self.model.modules())
-        list(self.model.named_modules())
-        self.model.hook_dict
+        all_edges_collection = base_correspondence.all_edges()
+        g = graph_from_edges(edge_collection=all_edges_collection, filename="nielstest.png", show_everything=True)
 
-        def test_hook(hook_point_out: torch.Tensor, hook: HookPoint) -> torch.Tensor:
+        def example_hook(hook_point_out: torch.Tensor, hook: HookPoint) -> torch.Tensor:
             print(123)
             return hook_point_out + 1000
 
         hook_name = "blocks.3.hook_resid_post"
 
-        output = self.model.run_with_hooks(input, fwd_hooks=[(hook_name, test_hook)])
+        output = self.model.run_with_hooks(input, fwd_hooks=[(hook_name, example_hook)])
 
         print(123)
         pass

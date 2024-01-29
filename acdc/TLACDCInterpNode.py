@@ -1,6 +1,6 @@
 from acdc.TLACDCEdge import (
     TorchIndex,
-    Edge,
+    EdgeInfo,
     EdgeType,
 )  # these introduce several important classes !!!
 from typing import List, Dict, Optional, Tuple, Union, Set, Callable, TypeVar, Iterable, Any

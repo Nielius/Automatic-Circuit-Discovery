@@ -30,7 +30,7 @@ from acdc.acdc_utils import (
 )
 
 from acdc.TLACDCEdge import (
-    Edge,
+    EdgeInfo,
     EdgeType,
     TorchIndex,
 )

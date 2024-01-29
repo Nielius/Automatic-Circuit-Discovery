@@ -109,7 +109,7 @@ from acdc.acdc_utils import (
     cleanup,
     ct,
     TorchIndex,
-    Edge,
+    EdgeInfo,
     EdgeType,
 )  # these introduce several important classes !!!
 

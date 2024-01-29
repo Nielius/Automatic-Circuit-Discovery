@@ -38,7 +38,7 @@ class EdgeType(Enum):
         return self.value == other.value
 
 
-class Edge:
+class EdgeInfo:
     def __init__(
         self,
         edge_type: EdgeType,
@@ -117,4 +117,4 @@ class TorchIndex:
     def graphviz_index(self, use_actual_colon=True) -> str:
         return self.__repr__(use_actual_colon=use_actual_colon)
 
-EdgeCollection: TypeAlias = dict[tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], Edge]
+EdgeCollection: TypeAlias = dict[tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], EdgeInfo]

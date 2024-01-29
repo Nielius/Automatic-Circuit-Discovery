@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from dataclasses import dataclass
 from acdc.TLACDCEdge import (
-    Edge,
+    EdgeInfo,
     EdgeType,
     TorchIndex,
 )

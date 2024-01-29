@@ -17,7 +17,7 @@ from transformer_lens.HookedTransformer import HookedTransformer
 
 from acdc.TLACDCEdge import (
     TorchIndex,
-    Edge,
+    EdgeInfo,
     EdgeType,
 )  # these introduce several important classes !!!
 

@@ -18,7 +18,7 @@ from acdc.greaterthan.utils import get_all_greaterthan_things
 from acdc.induction.utils import get_all_induction_things
 from acdc.ioi.utils import get_all_ioi_things
 from acdc.TLACDCCorrespondence import TLACDCCorrespondence
-from acdc.TLACDCEdge import Edge, EdgeType, TorchIndex
+from acdc.TLACDCEdge import EdgeInfo, EdgeType, TorchIndex
 from acdc.TLACDCInterpNode import TLACDCInterpNode
 from acdc.tracr_task.utils import get_all_tracr_things
 

@@ -2,7 +2,7 @@ from acdc.TLACDCInterpNode import TLACDCInterpNode
 from collections import OrderedDict
 from acdc.TLACDCEdge import (
     TorchIndex,
-    Edge,
+    EdgeInfo,
     EdgeType,
     HookPointName,
     EdgeCollection,
@@ -19,7 +19,7 @@ class TLACDCCorrespondence:
 
     nodes: MutableMapping[HookPointName, MutableMapping[TorchIndex, TLACDCInterpNode]]
     edges: MutableMapping[
-        HookPointName, MutableMapping[TorchIndex, MutableMapping[HookPointName, MutableMapping[TorchIndex, Edge]]]
+        HookPointName, MutableMapping[TorchIndex, MutableMapping[HookPointName, MutableMapping[TorchIndex, EdgeInfo]]]
     ]
 
     def __init__(self):
@@ -35,7 +35,7 @@ class TLACDCCorrespondence:
 
     def edge_iterator(
         self, present_only: bool = False
-    ) -> Iterator[tuple[tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], Edge]]:
+    ) -> Iterator[tuple[tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], EdgeInfo]]:
         for child_name, rest1 in self.edges.items():
             for child_index, rest2 in rest1.items():
                 for parent_name, rest3 in rest2.items():
@@ -69,7 +69,7 @@ class TLACDCCorrespondence:
         self,
         parent_node: TLACDCInterpNode,
         child_node: TLACDCInterpNode,
-        edge: Edge,
+        edge: EdgeInfo,
         safe=True,
     ):
         if safe:
@@ -144,7 +144,7 @@ class TLACDCCorrespondence:
                     correspondence.add_edge(
                         parent_node=cur_mlp,
                         child_node=residual_stream_node,
-                        edge=Edge(edge_type=EdgeType.ADDITION),
+                        edge=EdgeInfo(edge_type=EdgeType.ADDITION),
                         safe=False,
                     )
 
@@ -159,7 +159,7 @@ class TLACDCCorrespondence:
                 correspondence.add_edge(
                     parent_node=cur_mlp_input,
                     child_node=cur_mlp,
-                    edge=Edge(
+                    edge=EdgeInfo(
                         edge_type=EdgeType.PLACEHOLDER
                     ),  # EDIT: previously, this was a DIRECT_COMPUTATION edge, but that leads to overcounting of MLP edges (I think)
                     safe=False,
@@ -184,7 +184,7 @@ class TLACDCCorrespondence:
                     correspondence.add_edge(
                         parent_node=cur_head,
                         child_node=residual_stream_node,
-                        edge=Edge(edge_type=EdgeType.ADDITION),
+                        edge=EdgeInfo(edge_type=EdgeType.ADDITION),
                         safe=False,
                     )
 
@@ -206,14 +206,14 @@ class TLACDCCorrespondence:
                     correspondence.add_edge(
                         parent_node=hook_letter_node,
                         child_node=cur_head,
-                        edge=Edge(edge_type=EdgeType.PLACEHOLDER),
+                        edge=EdgeInfo(edge_type=EdgeType.PLACEHOLDER),
                         safe=False,
                     )
 
                     correspondence.add_edge(
                         parent_node=hook_letter_input_node,
                         child_node=hook_letter_node,
-                        edge=Edge(edge_type=EdgeType.DIRECT_COMPUTATION),
+                        edge=EdgeInfo(edge_type=EdgeType.DIRECT_COMPUTATION),
                         safe=False,
                     )
 
@@ -248,7 +248,7 @@ class TLACDCCorrespondence:
                 correspondence.add_edge(
                     parent_node=embed_node,
                     child_node=node,
-                    edge=Edge(edge_type=EdgeType.ADDITION),
+                    edge=EdgeInfo(edge_type=EdgeType.ADDITION),
                     safe=False,
                 )
 
