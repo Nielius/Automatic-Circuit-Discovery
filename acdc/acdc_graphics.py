@@ -155,7 +155,7 @@ def show(
     Colorscheme: a color for each node name, or a string corresponding to a cmapy color scheme
     """
     return graph_from_edges(
-        correspondence.all_edges(),
+        correspondence.edge_dict(),
         filename=fname,
         colorscheme=build_random_colorscheme_for_correspondence(
             correspondence, colorscheme, show_full_index=show_full_index

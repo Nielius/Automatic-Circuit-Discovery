@@ -184,7 +184,7 @@ show_corr(correspondence)
 #
 # %%
 
-for _, edge in correspondence.all_edges().items():
+for _, edge in correspondence.edge_dict().items():
     edge.effect_size = 1.0
 
 show_corr(correspondence)

@@ -1,5 +1,6 @@
 import sys
 from collections import defaultdict
+from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, List, TypeAlias
 
@@ -116,5 +117,31 @@ class TorchIndex:
 
     def graphviz_index(self, use_actual_colon=True) -> str:
         return self.__repr__(use_actual_colon=use_actual_colon)
+
+
+@dataclass
+class IndexedHookPointName:
+    hook_name: HookPointName
+    index: TorchIndex
+
+    def __repr__(self) -> str:
+        return f"IndexedHookID({self.hook_name}, {self.index})"
+
+    def __str__(self) -> str:
+        return f"{self.hook_name}{self.index}"
+
+
+@dataclass
+class Edge:
+    source: IndexedHookPointName
+    target: IndexedHookPointName
+    edge_info: EdgeInfo
+
+    def __repr__(self) -> str:
+        return f"Edge({self.source}, {self.target}, {self.edge_info})"
+
+    def __str__(self) -> str:
+        return f"{self.source} -> {self.target} ({self.edge_info})"
+
 
 EdgeCollection: TypeAlias = dict[tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], EdgeInfo]

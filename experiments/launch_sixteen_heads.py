@@ -365,7 +365,7 @@ for nodes, hook_name, idx in tqdm.tqdm(nodes_names_indices):
     corr, head_parents = iterative_correspondence_from_mask(
         model, nodes_to_mask, use_pos_embed=False, newv=False, corr=corr, head_parents=head_parents
     )
-    for e in corr.all_edges().values():
+    for e in corr.edge_dict().values():
         e.effect_size = 1.0
     score = prune_scores[hook_name][idx].item()
 

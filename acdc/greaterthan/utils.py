@@ -321,7 +321,7 @@ def get_greaterthan_true_edges(model):
         model=model,
         nodes_to_mask=[],
     )
-    for t, e in corr.all_edges().items():
+    for t, e in corr.edge_dict().items():
         e.present = False
 
     connected_pairs = [
@@ -421,7 +421,7 @@ def get_greaterthan_true_edges(model):
     ret = OrderedDict(
         {
             (t[0], t[1].hashable_tuple, t[2], t[3].hashable_tuple): edge.present
-            for t, edge in corr.all_edges().items()
+            for t, edge in corr.edge_dict().items()
             if edge.present
         }
     )

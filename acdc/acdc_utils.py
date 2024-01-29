@@ -259,7 +259,7 @@ def get_present_nodes(graph) -> tuple[set[tuple[str, TorchIndex]], set[tuple[str
     present_nodes = set()
     all_nodes = set()
 
-    for t, e in graph.all_edges().items():
+    for t, e in graph.edge_dict().items():
         all_nodes.add((t[0], t[1]))
         all_nodes.add((t[2], t[3]))
 
@@ -292,8 +292,8 @@ def filter_nodes(nodes: set[tuple[str, TorchIndex]]) -> set[tuple[str, TorchInde
 
 
 def get_node_stats(ground_truth, recovered) -> dict[str, int]:
-    assert set(ground_truth.all_edges().keys()) == set(
-        recovered.all_edges().keys()
+    assert set(ground_truth.edge_dict().keys()) == set(
+        recovered.edge_dict().keys()
     ), "There is a mismatch between the keys we're cmparing here"
 
     ground_truth_nodes, all_nodes = get_present_nodes(ground_truth)
@@ -347,12 +347,12 @@ def get_node_stats(ground_truth, recovered) -> dict[str, int]:
 
 
 def get_edge_stats(ground_truth, recovered):
-    assert set(ground_truth.all_edges().keys()) == set(
-        recovered.all_edges().keys()
+    assert set(ground_truth.edge_dict().keys()) == set(
+        recovered.edge_dict().keys()
     ), "There is a mismatch between the keys we're comparing here"
 
-    ground_truth_all_edges = ground_truth.all_edges()
-    recovered_all_edges = recovered.all_edges()
+    ground_truth_all_edges = ground_truth.edge_dict()
+    recovered_all_edges = recovered.edge_dict()
 
     counts = {
         "true positive": 0,

@@ -458,7 +458,7 @@ if __name__ == "__main__":
         canonical_circuit_subgraph = TLACDCCorrespondence.setup_from_model(masked_model.model, use_pos_embed=False)
         d_trues = set(get_true_edges())
 
-        for (receiver_name, receiver_index, sender_name, sender_index), edge in canonical_circuit_subgraph.all_edges().items():
+        for (receiver_name, receiver_index, sender_name, sender_index), edge in canonical_circuit_subgraph.edge_dict().items():
             key =(receiver_name, receiver_index.hashable_tuple, sender_name, sender_index.hashable_tuple)
             edge.present = (key in d_trues)
 

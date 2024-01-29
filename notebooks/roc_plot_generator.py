@@ -454,7 +454,7 @@ COLORSCHEME_FOR = collections.defaultdict(
 )
 
 if TASK != "induction":
-    d = {(d[0], d[1].hashable_tuple, d[2], d[3].hashable_tuple): False for d in exp.corr.all_edges()}
+    d = {(d[0], d[1].hashable_tuple, d[2], d[3].hashable_tuple): False for d in exp.corr.edge_dict()}
     d_trues = get_true_edges()
     # if ONLY_SAVE_CANONICAL and TASK == "ioi":
     #     # Remove non-adjacent layer connections
@@ -470,15 +470,15 @@ if TASK != "induction":
 
     exp.load_subgraph(d)
     canonical_circuit_subgraph = deepcopy(exp.corr)
-    for t in exp.corr.all_edges().keys():
+    for t in exp.corr.edge_dict().keys():
         exp.corr.edges[t[0]][t[1]][t[2]][t[3]].present = True
     canonical_circuit_subgraph_size = canonical_circuit_subgraph.count_num_edges()
 
     # and reset the sugbgraph...
-    for t, e in exp.corr.all_edges().items():
+    for t, e in exp.corr.edge_dict().items():
         exp.corr.edges[t[0]][t[1]][t[2]][t[3]].present = True
 
-    for edge in canonical_circuit_subgraph.all_edges().values():
+    for edge in canonical_circuit_subgraph.edge_dict().values():
         edge.effect_size = 1.0  # make it visible
 
     if ONLY_SAVE_CANONICAL:
@@ -501,7 +501,7 @@ if TASK != "induction":
 
         if TASK in ["ioi", "greaterthan"]:
             no_mlp = deepcopy(canonical_circuit_subgraph)
-            for (n_to, _, n_from, _), e in no_mlp.all_edges().items():
+            for (n_to, _, n_from, _), e in no_mlp.edge_dict().items():
                 if "mlp" in n_to or "mlp" in n_from:
                     e.present = False
             show(
@@ -645,10 +645,10 @@ def get_acdc_runs(
                         corr.edges[child.name][child.index][parent.name][parent.index].present = True
                 print("Before copying: n_edges=", corr.count_num_edges())
 
-                corr_all_edges = corr.all_edges().items()
+                corr_all_edges = corr.edge_dict().items()
 
                 corr_to_copy = deepcopy(exp.corr)
-                new_all_edges = corr_to_copy.all_edges()
+                new_all_edges = corr_to_copy.edge_dict()
                 for edge in new_all_edges.values():
                     edge.present = False
 
@@ -690,7 +690,7 @@ def get_acdc_runs(
 
         else:
             corr = deepcopy(exp.corr)
-            all_edges = corr.all_edges()
+            all_edges = corr.edge_dict()
             for edge in all_edges.values():
                 edge.present = False
 
@@ -746,11 +746,11 @@ if not SKIP_ACDC:  # this is slow, so run once
 
 def get_canonical_corrs(exp):
     all_present_corr = deepcopy(exp.corr)
-    for e in all_present_corr.all_edges().values():
+    for e in all_present_corr.edge_dict().values():
         e.present = True
 
     none_present_corr = deepcopy(exp.corr)
-    for e in none_present_corr.all_edges().values():
+    for e in none_present_corr.edge_dict().values():
         e.present = False
 
     output = [

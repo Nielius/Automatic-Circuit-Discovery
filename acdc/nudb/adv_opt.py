@@ -72,7 +72,7 @@ class AblationRunner:
             self.model, True if self.model.cfg.positional_embedding_type == "standard" else NotImplementedError()
         )
 
-        all_edges_collection = base_correspondence.all_edges()
+        all_edges_collection = base_correspondence.edge_dict()
         g = graph_from_edges(edge_collection=all_edges_collection, filename="nielstest.png", show_everything=True)
 
         def example_hook(hook_point_out: torch.Tensor, hook: HookPoint) -> torch.Tensor:

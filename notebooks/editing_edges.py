@@ -168,7 +168,7 @@ experiment.setup_model_hooks(
 # Let's take a look at the edges
 
 # %%
-for edge_indices, edge in experiment.corr.all_edges().items():
+for edge_indices, edge in experiment.corr.edge_dict().items():
     # here's what's inside the edge
     receiver_name, receiver_index, sender_name, sender_index = edge_indices
 

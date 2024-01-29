@@ -51,7 +51,7 @@ class TLACDCCorrespondence:
                         if not present_only or edge.present:
                             yield (child_name, child_index, parent_name, parent_index), edge
 
-    def all_edges(self, present_only: bool = False) -> EdgeCollection:
+    def edge_dict(self, present_only: bool = False) -> EdgeCollection:
         """Concatenate all edges in the graph"""
         return {
             (child_name, child_index, parent_name, parent_index): edge
@@ -257,7 +257,7 @@ class TLACDCCorrespondence:
     def count_num_edges(self, verbose=False) -> int:
         cnt = 0
 
-        for tupl, edge in self.all_edges().items():
+        for tupl, edge in self.edge_dict().items():
             if edge.present and edge.edge_type != EdgeType.PLACEHOLDER:
                 cnt += 1
                 if verbose:

@@ -127,7 +127,7 @@ def test_induction_several_steps():
         exp.step()
 
     edges_to_consider = {
-        edge_tuple: edge for edge_tuple, edge in exp.corr.all_edges().items() if edge.effect_size is not None
+        edge_tuple: edge for edge_tuple, edge in exp.corr.edge_dict().items() if edge.effect_size is not None
     }
 
     EDGE_EFFECTS = OrderedDict(
@@ -342,7 +342,7 @@ def test_full_correspondence_zero_kl(
     exp.setup_corrupted_cache()
 
     corr = deepcopy(exp.corr)
-    for e in corr.all_edges().values():
+    for e in corr.edge_dict().values():
         e.present = True
 
     with torch.no_grad():

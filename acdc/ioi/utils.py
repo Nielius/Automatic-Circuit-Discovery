@@ -301,7 +301,7 @@ def get_ioi_true_edges(model):
     ret = OrderedDict(
         {
             (t[0], t[1].hashable_tuple, t[2], t[3].hashable_tuple): e.present
-            for t, e in corr.all_edges().items()
+            for t, e in corr.edge_dict().items()
             if e.present
         }
     )

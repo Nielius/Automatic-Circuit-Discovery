@@ -417,7 +417,7 @@ class TLACDCExperiment:
             "corrupted": "cpu" if self.corrupted_cache_cpu else None,
         }[cache]
 
-        for big_tuple, edge in self.corr.all_edges().items():
+        for big_tuple, edge in self.corr.edge_dict().items():
             nodes = []
 
             if edge.edge_type == EdgeType.DIRECT_COMPUTATION:
@@ -544,7 +544,7 @@ class TLACDCExperiment:
         TODO pickling of the whole experiment work"""
 
         edges_list = []
-        for t, e in self.corr.all_edges().items():
+        for t, e in self.corr.edge_dict().items():
             if e.present and e.edge_type != EdgeType.PLACEHOLDER:
                 edges_list.append((t, e.effect_size))
 
@@ -882,7 +882,7 @@ class TLACDCExperiment:
         """Saves the subgraph as a Dictionary of all the edges, so it can be reloaded (or return that)"""
 
         ret = OrderedDict()
-        for tupl, edge in self.corr.all_edges().items():
+        for tupl, edge in self.corr.edge_dict().items():
             receiver_name, receiver_torch_index, sender_name, sender_torch_index = tupl
             receiver_index, sender_index = receiver_torch_index.hashable_tuple, sender_torch_index.hashable_tuple
             ret[(receiver_name, receiver_index, sender_name, sender_index)] = edge.present
@@ -901,7 +901,7 @@ class TLACDCExperiment:
 
         # assert formatting is correct
         set_of_edges = set()
-        for tupl, edge in self.corr.all_edges().items():
+        for tupl, edge in self.corr.edge_dict().items():
             receiver_name, receiver_torch_index, sender_name, sender_torch_index = tupl
             receiver_index, sender_index = receiver_torch_index.hashable_tuple, sender_torch_index.hashable_tuple
             set_of_edges.add((receiver_name, receiver_index, sender_name, sender_index))
@@ -923,7 +923,7 @@ class TLACDCExperiment:
         """Set the current subgraph equal to one from a wandb run"""
 
         # initialize by marking no edges as present
-        for _, edge in self.corr.all_edges().items():
+        for _, edge in self.corr.edge_dict().items():
             edge.present = False
 
         found_at_least_one_readable_line = False
@@ -982,7 +982,7 @@ class TLACDCExperiment:
     def add_back_head(self, layer_idx, head_idx):
         raise NotImplementedError("This is wrong do not use")
 
-        all_edges = self.corr.all_edges()
+        all_edges = self.corr.edge_dict()
         for tupl, edge in all_edges.items():
             for hook_name, hook_idx in [(tupl[0], tupl[1]), (tupl[2], tupl[3])]:
                 if (
