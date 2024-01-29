@@ -5,15 +5,16 @@ from acdc.TLACDCEdge import (
     Edge,
     EdgeType,
     HookPointName,
+    EdgeCollection,
 )  # these introduce several important classes !!!
 from acdc.acdc_utils import OrderedDefaultdict, make_nd_dict
-from typing import List, Dict, MutableMapping, Optional, Tuple, Union, Set, Callable, TypeVar, Iterable, Any
+from typing import List, Dict, MutableMapping, Optional, Tuple, Union, Set, Callable, TypeVar, Iterable, Any, Iterator
 
 
 class TLACDCCorrespondence:
     """Stores the full computational graph, similar to ACDCCorrespondence from the rust_circuit code
 
-    The two attributes, self.graph and self.edges allow for efficiently looking up the nodes and edges in the graph: see `notebooks/editing_edges.py`
+    The two attributes, self.nodes and self.edges allow for efficiently looking up the nodes and edges in the graph: see `notebooks/editing_edges.py`
     """
 
     nodes: MutableMapping[HookPointName, MutableMapping[TorchIndex, TLACDCInterpNode]]
@@ -32,11 +33,9 @@ class TLACDCCorrespondence:
         """Concatenate all nodes in the graph"""
         return [node for by_index_list in self.nodes.values() for node in by_index_list.values()]
 
-    def all_edges(self) -> Dict[Tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], Edge]:
-        """Concatenate all edges in the graph"""
-
-        big_dict = {}
-
+    def edge_iterator(
+        self, present_only: bool = False
+    ) -> Iterator[tuple[tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], Edge]]:
         for child_name, rest1 in self.edges.items():
             for child_index, rest2 in rest1.items():
                 for parent_name, rest3 in rest2.items():
@@ -49,9 +48,17 @@ class TLACDCCorrespondence:
                             "Edges have been setup WRONG somehow...",
                         )
 
-                        big_dict[(child_name, child_index, parent_name, parent_index)] = edge
+                        if not present_only or edge.present:
+                            yield (child_name, child_index, parent_name, parent_index), edge
 
-        return big_dict
+    def all_edges(self, present_only: bool = False) -> EdgeCollection:
+        """Concatenate all edges in the graph"""
+        return {
+            (child_name, child_index, parent_name, parent_index): edge
+            for (child_name, child_index, parent_name, parent_index), edge in self.edge_iterator(
+                present_only=present_only
+            )
+        }
 
     def add_node(self, node: TLACDCInterpNode, safe=True):
         if safe:
@@ -124,7 +131,7 @@ class TLACDCCorrespondence:
         for layer_idx in range(model.cfg.n_layers - 1, -1, -1):
             # connect MLPs
             if not model.cfg.attn_only:
-                # this MLP writed to all future residual stream things
+                # this MLP writes to all future residual stream things
                 cur_mlp_name = f"blocks.{layer_idx}.hook_mlp_out"
                 cur_mlp_slice = TorchIndex([None])
                 cur_mlp = TLACDCInterpNode(

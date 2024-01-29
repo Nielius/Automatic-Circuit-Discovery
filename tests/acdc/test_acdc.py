@@ -76,7 +76,7 @@ from acdc.induction.utils import (
 from acdc.ioi.utils import get_all_ioi_things
 from acdc.tracr_task.utils import get_all_tracr_things, get_tracr_model_input_and_tl_model
 from acdc.acdc_graphics import (
-    build_colorscheme,
+    build_random_colorscheme_for_correspondence,
     show,
 )
 import pytest

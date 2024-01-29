@@ -132,7 +132,7 @@ from acdc.induction.utils import (
 )
 from acdc.greaterthan.utils import get_all_greaterthan_things
 
-from acdc.acdc_graphics import build_colorscheme, show
+from acdc.acdc_graphics import build_random_colorscheme_for_correspondence, show
 import argparse
 
 torch.autograd.set_grad_enabled(False)

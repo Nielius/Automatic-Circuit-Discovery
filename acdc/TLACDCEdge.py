@@ -116,3 +116,5 @@ class TorchIndex:
 
     def graphviz_index(self, use_actual_colon=True) -> str:
         return self.__repr__(use_actual_colon=use_actual_colon)
+
+EdgeCollection: TypeAlias = dict[tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], Edge]

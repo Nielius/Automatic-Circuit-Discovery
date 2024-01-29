@@ -127,8 +127,8 @@ from acdc.induction.utils import (
     get_mask_repeat_candidates,
 )
 from acdc.acdc_graphics import (
-    build_colorscheme,
-    get_node_name,
+    build_random_colorscheme_for_correspondence,
+    get_pretty_graph_name_for_interp_node,
     show,
 )
 from acdc.ioi.utils import (

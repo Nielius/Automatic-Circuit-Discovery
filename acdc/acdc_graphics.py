@@ -1,3 +1,5 @@
+import itertools
+
 import wandb
 import os
 from collections import defaultdict
@@ -6,7 +8,7 @@ import torch
 import numpy as np
 import huggingface_hub
 import datetime
-from typing import Dict, Union
+from typing import Dict, Union, Iterable
 import wandb
 import plotly.graph_objects as go
 import torch
@@ -17,6 +19,7 @@ from typing import List, Optional
 import warnings
 import networkx as nx
 from acdc.TLACDCCorrespondence import TLACDCCorrespondence
+from acdc.TLACDCEdge import EdgeCollection, HookPointName, TorchIndex
 from acdc.TLACDCInterpNode import TLACDCInterpNode
 from acdc.acdc_utils import EdgeType
 import pygraphviz as pgv
@@ -44,7 +47,12 @@ def generate_random_color(colorscheme: str) -> str:
     return rgb2hex(cmapy.color("Pastel2", np.random.randint(0, 256), rgb_order=True))
 
 
-def get_node_name(node: TLACDCInterpNode, show_full_index=True):
+def get_pretty_graph_name_for_interp_node(node: TLACDCInterpNode, show_full_index=True) -> str:
+    """Node name for use in pretty graphs"""
+    return get_pretty_graph_name_for_node(node.name, node.index, show_full_index=show_full_index)
+
+
+def get_pretty_graph_name_for_node(node_name: HookPointName, node_index: TorchIndex, show_full_index=True) -> str:
     """Node name for use in pretty graphs"""
 
     if not show_full_index:
@@ -53,55 +61,81 @@ def get_node_name(node: TLACDCInterpNode, show_full_index=True):
         qkv_input_substrings = [f"hook_{letter}_input" for letter in ["q", "k", "v"]]
 
         # Handle embedz
-        if "resid_pre" in node.name:
-            assert "0" in node.name and not any([str(i) in node.name for i in range(1, 10)])
+        if "resid_pre" in node_name:
+            assert "0" in node_name and not any([str(i) in node_name for i in range(1, 10)])
             name += "embed"
-            if len(node.index.hashable_tuple) > 2:
-                name += f"_[{node.index.hashable_tuple[2]}]"
+            if len(node_index.hashable_tuple) > 2:
+                name += f"_[{node_index.hashable_tuple[2]}]"
             return name
 
-        elif "embed" in node.name:
-            name = "pos_embeds" if "pos" in node.name else "token_embeds"
+        elif "embed" in node_name:
+            name = "pos_embeds" if "pos" in node_name else "token_embeds"
 
         # Handle q_input and hook_q etc
-        elif any([node.name.endswith(qkv_input_substring) for qkv_input_substring in qkv_input_substrings]):
+        elif any([node_name.endswith(qkv_input_substring) for qkv_input_substring in qkv_input_substrings]):
             relevant_letter = None
             for letter, qkv_substring in zip(["q", "k", "v"], qkv_substrings):
-                if qkv_substring in node.name:
+                if qkv_substring in node_name:
                     assert relevant_letter is None
                     relevant_letter = letter
-            name += "a" + node.name.split(".")[1] + "." + str(node.index.hashable_tuple[2]) + "_" + relevant_letter
+            name += "a" + node_name.split(".")[1] + "." + str(node_index.hashable_tuple[2]) + "_" + relevant_letter
 
         # Handle attention hook_result
-        elif "hook_result" in node.name or any([qkv_substring in node.name for qkv_substring in qkv_substrings]):
-            name = "a" + node.name.split(".")[1] + "." + str(node.index.hashable_tuple[2])
+        elif "hook_result" in node_name or any([qkv_substring in node_name for qkv_substring in qkv_substrings]):
+            name = "a" + node_name.split(".")[1] + "." + str(node_index.hashable_tuple[2])
 
         # Handle MLPs
-        elif node.name.endswith("resid_mid"):
+        elif node_name.endswith("resid_mid"):
             raise ValueError("We removed resid_mid annotations. Call these mlp_in now.")
-        elif node.name.endswith("mlp_out") or node.name.endswith("mlp_in"):
-            name = "m" + node.name.split(".")[1]
+        elif node_name.endswith("mlp_out") or node_name.endswith("mlp_in"):
+            name = "m" + node_name.split(".")[1]
 
         # Handle resid_post
-        elif "resid_post" in node.name:
+        elif "resid_post" in node_name:
             name += "resid_post"
 
         else:
-            raise ValueError(f"Unrecognized node name {node.name}")
+            raise ValueError(f"Unrecognized node name {node_name}")
 
     else:
-        name = node.name + str(node.index.graphviz_index(use_actual_colon=True))
+        name = node_name + str(node_index.graphviz_index(use_actual_colon=True))
 
     return "<" + name + ">"
 
 
-def build_colorscheme(
+def build_random_colorscheme_for_correspondence(
     correspondence: TLACDCCorrespondence, colorscheme: str = "Pastel2", show_full_index=True
 ) -> Dict[str, str]:
     colors = {}
     for node in correspondence.nodes_list():
-        colors[get_node_name(node, show_full_index=show_full_index)] = generate_random_color(colorscheme)
+        colors[get_pretty_graph_name_for_interp_node(node, show_full_index=show_full_index)] = generate_random_color(
+            colorscheme
+        )
     return colors
+
+
+def build_random_colorscheme_for_edge_collection(
+    edge_collection: EdgeCollection, colorscheme: str = "Pastel2", show_full_index=True
+) -> dict[str, str]:
+    return build_random_colorscheme_for_nodes(
+        itertools.chain(
+            ((node_name, node_index) for node_name, node_index, _, _ in edge_collection.keys()),
+            ((node_name, node_index) for _, _, node_name, node_index in edge_collection.keys()),
+        ),
+        colorscheme,
+        show_full_index=show_full_index,
+    )
+
+
+def build_random_colorscheme_for_nodes(
+    nodes: Iterable[tuple[HookPointName, TorchIndex]], colorscheme: str = "Pastel2", show_full_index=True
+) -> dict[str, str]:
+    return {
+        get_pretty_graph_name_for_node(node_name, node_index, show_full_index=show_full_index): generate_random_color(
+            colorscheme
+        )
+        for node_name, node_index in nodes
+    }
 
 
 def show(
@@ -120,87 +154,123 @@ def show(
     """
     Colorscheme: a color for each node name, or a string corresponding to a cmapy color scheme
     """
+    return graph_from_edges(
+        correspondence.all_edges(),
+        filename=fname,
+        colorscheme=build_random_colorscheme_for_correspondence(
+            correspondence, colorscheme, show_full_index=show_full_index
+        ),
+        minimum_penwidth=minimum_penwidth,
+        show_full_index=show_full_index,
+        remove_self_loops=remove_self_loops,
+        remove_qkv=remove_qkv,
+        layout=layout,
+        edge_type_colouring=edge_type_colouring,
+        show_placeholders=show_placeholders,
+        seed=seed,
+    )
+
+
+def graph_from_edges(
+    edge_collection: EdgeCollection,
+    filename: str | None = None,
+    colorscheme: Union[Dict, str] = "Pastel2",
+    minimum_penwidth: float = 0.3,
+    show_full_index: bool = True,
+    remove_self_loops: bool = True,
+    remove_qkv: bool = False,
+    layout: str = "dot",
+    edge_type_colouring: bool = False,
+    show_placeholders: bool = False,
+    show_everything: bool = False,
+    seed: Optional[int] = None,
+) -> pgv.AGraph:
+    """
+    Colorscheme: a color for each node name, or a string corresponding to a cmapy color scheme
+
+    filename: if not None, save the graph to this filename
+    """
     g = pgv.AGraph(directed=True, bgcolor="transparent", overlap="false", splines="true", layout=layout)
 
     if seed is not None:
         np.random.seed(seed)
 
-    groups = {}
+    color_groups = {}
     if isinstance(colorscheme, str):
-        colors = build_colorscheme(correspondence, colorscheme, show_full_index=show_full_index)
+        colors = build_random_colorscheme_for_edge_collection(
+            edge_collection,
+            colorscheme,
+            show_full_index=show_full_index,
+        )
     else:
         colors = colorscheme
         for name, color in colors.items():
-            if color not in groups:
-                groups[color] = [name]
+            if color not in color_groups:
+                color_groups[color] = [name]
             else:
-                groups[color].append(name)
+                color_groups[color].append(name)
 
     node_pos = {}
-    if fname is not None:
-        base_fname = ".".join(str(fname).split(".")[:-1])
+    if filename is not None:
+        filename_without_extension = ".".join(str(filename).split(".")[:-1])
 
-        base_path = Path(base_fname)
-        fpath = base_path / "layout.gv"
+        dir_for_groups = Path(filename_without_extension)
+        fpath = dir_for_groups / "layout.gv"
         if fpath.exists():
             g_pos = pgv.AGraph()
             g_pos.read(fpath)
             for node in g_pos.nodes():
                 node_pos[node.name] = node.attr["pos"]
 
-    # create all nodes
-    for child_hook_name in correspondence.edges:
-        for child_index in correspondence.edges[child_hook_name]:
-            for parent_hook_name in correspondence.edges[child_hook_name][child_index]:
-                for parent_index in correspondence.edges[child_hook_name][child_index][parent_hook_name]:
-                    edge = correspondence.edges[child_hook_name][child_index][parent_hook_name][parent_index]
+    # create all nodes and edges
+    for (child_hook_name, child_index, parent_hook_name, parent_index), edge in edge_collection.items():
+        parent_name = get_pretty_graph_name_for_node(parent_hook_name, parent_index, show_full_index=show_full_index)
+        child_name = get_pretty_graph_name_for_node(child_hook_name, child_index, show_full_index=show_full_index)
 
-                    parent = correspondence.nodes[parent_hook_name][parent_index]
-                    child = correspondence.nodes[child_hook_name][child_index]
+        if remove_qkv:
+            parent_name = parent_name.replace("_q>", ">").replace("_k>", ">").replace("_v>", ">")
+            child_name = child_name.replace("_q>", ">").replace("_k>", ">").replace("_v>", ">")
 
-                    parent_name = get_node_name(parent, show_full_index=show_full_index)
-                    child_name = get_node_name(child, show_full_index=show_full_index)
+        if remove_self_loops and parent_name == child_name:
+            # Important this go after the qkv removal
+            continue
 
-                    if remove_qkv:
-                        parent_name = parent_name.replace("_q>", ">").replace("_k>", ">").replace("_v>", ">")
-                        child_name = child_name.replace("_q>", ">").replace("_k>", ">").replace("_v>", ">")
+        if not show_everything:
+            if (
+                (not edge.present)
+                or edge.effect_size is None
+                or ((not show_placeholders) and edge.edge_type == EdgeType.PLACEHOLDER)
+            ):
+                continue
 
-                    if remove_self_loops and parent_name == child_name:
-                        # Important this go after the qkv removal
-                        continue
+        for node_name in [parent_name, child_name]:
+            maybe_pos = {}
+            if node_name in node_pos:
+                maybe_pos["pos"] = node_pos[node_name]
+            g.add_node(
+                node_name,
+                fillcolor=colors[node_name],
+                color="black",
+                style="filled, rounded",
+                shape="box",
+                fontname="Helvetica",
+                **maybe_pos,
+            )
 
-                    if (edge.present and edge.effect_size is not None) and (
-                        edge.edge_type != EdgeType.PLACEHOLDER or show_placeholders
-                    ):
-                        for node_name in [parent_name, child_name]:
-                            maybe_pos = {}
-                            if node_name in node_pos:
-                                maybe_pos["pos"] = node_pos[node_name]
-                            g.add_node(
-                                node_name,
-                                fillcolor=colors[node_name],
-                                color="black",
-                                style="filled, rounded",
-                                shape="box",
-                                fontname="Helvetica",
-                                **maybe_pos,
-                            )
+        g.add_edge(
+            parent_name,
+            child_name,
+            penwidth=str(max(minimum_penwidth, edge.effect_size or 0) * 2),
+            color=colors[parent_name] if not edge_type_colouring else EDGE_TYPE_COLORS[edge.edge_type.value],
+        )
 
-                        g.add_edge(
-                            parent_name,
-                            child_name,
-                            penwidth=str(max(minimum_penwidth, edge.effect_size) * 2),
-                            color=colors[parent_name]
-                            if not edge_type_colouring
-                            else EDGE_TYPE_COLORS[edge.edge_type.value],
-                        )
+    if filename is not None:
+        assert len(filename.split(".")) > 1, "filename must have an extension"
+        filename_without_extension = Path(filename).stem
 
-    if fname is not None:
-        base_fname = ".".join(str(fname).split(".")[:-1])
-
-        base_path = Path(base_fname)
-        base_path.mkdir(exist_ok=True)
-        for k, s in groups.items():
+        dir_for_groups = Path(filename_without_extension)
+        dir_for_groups.mkdir(exist_ok=True)
+        for k, s in color_groups.items():
             g2 = pgv.AGraph(directed=True, bgcolor="transparent", overlap="false", splines="true", layout="neato")
             for node_name in s:
                 g2.add_node(
@@ -211,12 +281,12 @@ def show(
             for i in range(len(s)):
                 for j in range(i + 1, len(s)):
                     g2.add_edge(s[i], s[j], style="invis", weight=200)
-            g2.write(path=base_path / f"{k}.gv")
+            g2.write(path=dir_for_groups / f"{k}.gv")
 
-        g.write(path=base_fname + ".gv")
+        g.write(path=filename_without_extension + ".gv")
 
-        if not fname.endswith(".gv"):  # turn the .gv file into a .png file
-            g.draw(path=fname, prog="dot")
+        if not filename.endswith(".gv"):  # turn the .gv file into a .png file
+            g.draw(path=filename, prog="dot")
 
     return g
 
