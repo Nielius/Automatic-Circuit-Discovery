@@ -119,6 +119,12 @@ class TorchIndex:
         return self.__repr__(use_actual_colon=use_actual_colon)
 
 
+def is_attn_hook_point(name: HookPointName) -> bool:
+    if "mlp" in name or "resid" in name or "embed" in name or name == "blocks.0.hook_resid_pre":
+        return False
+    return True
+
+
 @dataclass(eq=True, frozen=True, slots=True)
 class IndexedHookPointName:
     hook_name: HookPointName
@@ -130,8 +136,27 @@ class IndexedHookPointName:
     def __str__(self) -> str:
         return f"{self.hook_name}{self.index}"
 
+    @classmethod
+    def list_from_hook_point(cls, name: HookPointName, n_heads: int) -> list["IndexedHookPointName"]:
+        """Provides a list of all IndexedHookPointNames that are sub-components of the given HookPointName."""
+        if is_attn_hook_point(name):
+            return [
+                IndexedHookPointName(
+                    hook_name=name,
+                    index=TorchIndex([None, None, i]),
+                )
+                for i in range(n_heads)
+            ]
+        else:
+            return [
+                IndexedHookPointName(
+                    hook_name=name,
+                    index=TorchIndex([None]),
+                )
+            ]
 
-@dataclass
+
+@dataclass(eq=True, frozen=True, slots=True)
 class Edge:
     """An edge in the computational graph, pointing from parent to child."""
 

@@ -1,5 +1,7 @@
+import itertools
+import random
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Iterator
 
 import torch
 from jaxtyping import Shaped, Float, Num
@@ -8,10 +10,11 @@ from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 
 from acdc.TLACDCCorrespondence import TLACDCCorrespondence
-from acdc.TLACDCEdge import EdgeWithInfo, Edge, IndexedHookPointName
+from acdc.TLACDCEdge import EdgeWithInfo, Edge, IndexedHookPointName, HookPointName, TorchIndex
 from acdc.acdc_graphics import graph_from_edges
-from acdc.docstring.utils import AllDataThings
+from acdc.docstring.utils import AllDataThings, get_all_docstring_things, get_docstring_subgraph_true_edges
 from acdc.greaterthan.utils import get_greaterthan_true_edges, get_all_greaterthan_things
+from acdc.induction.utils import get_all_induction_things
 from acdc.nudb.joblib_caching import joblib_memory
 from acdc.tracr_task.utils import get_all_tracr_things, get_tracr_reverse_edges
 
@@ -29,10 +32,27 @@ device = "cpu"
 
 
 @joblib_memory.cache
-def get_task_data() -> tuple[AllDataThings, dict]:
+def get_task_data_tracr_reverse() -> tuple[AllDataThings, dict]:
     # batch size 6, seq len 4
     task_data = get_all_tracr_things(task="reverse", metric_name="l2", num_examples=6, device=device)
     true_edges = get_tracr_reverse_edges()
+
+    return task_data, true_edges
+
+
+def get_task_data_docstring() -> tuple[AllDataThings, dict]:
+    task_data = get_all_docstring_things(num_examples=10, seq_len=4, device=device)
+    true_edges = get_docstring_subgraph_true_edges()
+
+    return task_data, true_edges
+
+
+@joblib_memory.cache
+def get_task_data_induction() -> tuple[AllDataThings, dict]:
+    # NOTE: this doesn't have a canonical circuit!
+    # batch size 6, seq len 4
+    task_data = get_all_induction_things(num_examples=10, seq_len=4, device=device)
+    raise NotImplementedError("No canoncial circuit for induction yet")
 
     return task_data, true_edges
 
@@ -51,7 +71,7 @@ def get_task_data_greaterthan() -> tuple[AllDataThings, dict]:
     return task_data, true_edges
 
 
-task_data, true_edges = get_task_data()
+task_data, true_edges = get_task_data_tracr_reverse()
 
 
 # Goal: run it once, calculate the metric
@@ -80,13 +100,40 @@ class CompleteMask:
 
 
 class MaskedRunner:
+    """
+    A class to run a forward pass on a HookedTransformer, with some edges disabled.
+
+    This class is intended to be mostly stateless."""
     masked_transformer: MaskedTransformer
+
+    _parent_index_per_child: dict[tuple[HookPointName, IndexedHookPointName], int]
+    _indexed_parents_per_child: dict[HookPointName, list[IndexedHookPointName]]
 
     def __init__(self, model: HookedTransformer):
         self.masked_transformer = MaskedTransformer(model=model)
         self.masked_transformer.freeze_weights()
         self._freeze_all_masks()
         self._set_all_masks_to_pos_infty()
+        self._set_up_parent_index_per_child()
+
+    def _set_up_parent_index_per_child(self):
+        # For every child, every possible parent in the edge has an index; this is the index of the mask in the list of masks for that child.
+        # This sets up a look-up table for that.
+        self._parent_index_per_child = {}
+        self._indexed_parents_per_child = {}
+
+        for child, all_parents in self.masked_transformer.parent_node_names.items():
+            # we expand the list of all_parents into a list of all indexed parents, so that we can give
+            # each of an index
+            all_indexed_parents: list[IndexedHookPointName] = list(
+                itertools.chain.from_iterable(
+                    IndexedHookPointName.list_from_hook_point(name, self.masked_transformer.n_heads)
+                    for name in all_parents
+                )
+            )
+            self._indexed_parents_per_child[child] = all_indexed_parents
+            for index, indexed_parent in enumerate(all_indexed_parents):
+                self._parent_index_per_child[(child, indexed_parent)] = index
 
     def _freeze_all_masks(self):
         """In the MaskedTransformer, every mask is a parameter. In this case, however,
@@ -98,13 +145,39 @@ class MaskedRunner:
         for parameter in self.masked_transformer._mask_logits_dict.values():
             parameter.data.fill_(float("inf"))
 
+    def _set_mask_for_edge(self, child: IndexedHookPointName, parent: IndexedHookPointName, value: float) -> None:
+        parent_index = self._parent_index_per_child[(child.hook_name, parent)]
+        # self._mask_logits_dict is dict[HookPointName of child, Num[torch.nn.Parameter, "parent (IndexedHookPoint), TorchIndex of child"]
+        # todo: I think child.index.as_index[-1] shows that we're not using the right abstraction here; or maybe it doesn't?
+        self.masked_transformer._mask_logits_dict[child.hook_name][parent_index][child.index.as_index[-1]] = value
+
+    @property
+    def all_ablatable_edges(self) -> set[Edge]:
+        return {
+            Edge(child=indexed_child, parent=indexed_parent)
+            for child, all_indexed_parents in self._indexed_parents_per_child.items()
+            for indexed_child in IndexedHookPointName.list_from_hook_point(child, self.masked_transformer.n_heads)
+            for indexed_parent in all_indexed_parents
+        }
+
     def run(
-        self, input: Num[torch.Tensor, "batch seq"], patch_input: Num[torch.Tensor, "batch seq"]
+        self,
+        input: Num[torch.Tensor, "batch seq"],
+        patch_input: Num[torch.Tensor, "batch seq"],
+        edges_to_ablate: list[Edge],
     ) -> Num[torch.Tensor, "batch pos vocab"]:
-        with self.masked_transformer.with_fwd_hooks_and_new_cache(
-            ablation="resample", ablation_data=patch_input
-        ) as hooked_model:
-            return hooked_model(input)
+        for edge in edges_to_ablate:
+            assert edge in self.all_ablatable_edges  # safety check
+            self._set_mask_for_edge(edge.child, edge.parent, float("-inf"))
+
+        try:
+            with self.masked_transformer.with_fwd_hooks_and_new_cache(
+                ablation="resample", ablation_data=patch_input
+            ) as hooked_model:
+                return hooked_model(input)
+        finally:
+            for edge in edges_to_ablate:
+                self._set_mask_for_edge(edge.child, edge.parent, float("inf"))  # this class is not intended to keep state
 
 
 @dataclass
@@ -162,6 +235,19 @@ class AdvOptExperiment:
         logits: Float[torch.Tensor, "batch pos vocab"] = self.runner.run(
             input=self.dataset,
             patch_input=self.corrupted_dataset,
+            edges_to_ablate=[
+                edge for edge in self.runner.all_ablatable_edges if random.random() < 0.5
+                # Edge(
+                #     child=IndexedHookPointName(
+                #         hook_name="blocks.3.hook_resid_post",
+                #         index=TorchIndex([None]),
+                #     ),
+                #     parent=IndexedHookPointName(
+                #         hook_name="blocks.2.hook_mlp_out",
+                #         index=TorchIndex([None]),
+                #     ),
+                # )
+            ],
         )
         cur_metric = self.metric(logits).item()
 
