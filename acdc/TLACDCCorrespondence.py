@@ -6,7 +6,7 @@ from acdc.TLACDCEdge import (
     EdgeType,
     HookPointName,
     EdgeCollection,
-    Edge,
+    EdgeWithInfo,
     IndexedHookPointName,
 )  # these introduce several important classes !!!
 from acdc.acdc_utils import OrderedDefaultdict, make_nd_dict
@@ -35,7 +35,7 @@ class TLACDCCorrespondence:
         """Concatenate all nodes in the graph"""
         return [node for by_index_list in self.nodes.values() for node in by_index_list.values()]
 
-    def edge_iterator(self, present_only: bool = False) -> Iterator[Edge]:
+    def edge_iterator(self, present_only: bool = False) -> Iterator[EdgeWithInfo]:
         for child_name, rest1 in self.edges.items():
             for child_index, rest2 in rest1.items():
                 for parent_name, rest3 in rest2.items():
@@ -49,7 +49,7 @@ class TLACDCCorrespondence:
                         )
 
                         if not present_only or edge_info.present:
-                            yield Edge(
+                            yield EdgeWithInfo(
                                 child=IndexedHookPointName(hook_name=parent_name, index=parent_index),
                                 parent=IndexedHookPointName(hook_name=child_name, index=child_index),
                                 edge_info=edge_info,

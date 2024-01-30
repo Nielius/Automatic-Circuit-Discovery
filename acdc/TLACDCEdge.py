@@ -134,6 +134,15 @@ class IndexedHookPointName:
 @dataclass
 class Edge:
     """An edge in the computational graph, pointing from parent to child."""
+
+    child: IndexedHookPointName
+    parent: IndexedHookPointName
+
+
+@dataclass
+class EdgeWithInfo:
+    """An edge in the computational graph, pointing from parent to child."""
+
     child: IndexedHookPointName
     parent: IndexedHookPointName
     edge_info: EdgeInfo
