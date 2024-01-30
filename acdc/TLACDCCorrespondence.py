@@ -6,6 +6,8 @@ from acdc.TLACDCEdge import (
     EdgeType,
     HookPointName,
     EdgeCollection,
+    Edge,
+    IndexedHookPointName,
 )  # these introduce several important classes !!!
 from acdc.acdc_utils import OrderedDefaultdict, make_nd_dict
 from typing import List, Dict, MutableMapping, Optional, Tuple, Union, Set, Callable, TypeVar, Iterable, Any, Iterator
@@ -33,14 +35,12 @@ class TLACDCCorrespondence:
         """Concatenate all nodes in the graph"""
         return [node for by_index_list in self.nodes.values() for node in by_index_list.values()]
 
-    def edge_iterator(
-        self, present_only: bool = False
-    ) -> Iterator[tuple[tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], EdgeInfo]]:
+    def edge_iterator(self, present_only: bool = False) -> Iterator[Edge]:
         for child_name, rest1 in self.edges.items():
             for child_index, rest2 in rest1.items():
                 for parent_name, rest3 in rest2.items():
-                    for parent_index, edge in rest3.items():
-                        assert edge is not None, (
+                    for parent_index, edge_info in rest3.items():
+                        assert edge_info is not None, (
                             child_name,
                             child_index,
                             parent_name,
@@ -48,17 +48,16 @@ class TLACDCCorrespondence:
                             "Edges have been setup WRONG somehow...",
                         )
 
-                        if not present_only or edge.present:
-                            yield (child_name, child_index, parent_name, parent_index), edge
+                        if not present_only or edge_info.present:
+                            yield Edge(
+                                child=IndexedHookPointName(hook_name=parent_name, index=parent_index),
+                                parent=IndexedHookPointName(hook_name=child_name, index=child_index),
+                                edge_info=edge_info,
+                            )
 
     def edge_dict(self, present_only: bool = False) -> EdgeCollection:
         """Concatenate all edges in the graph"""
-        return {
-            (child_name, child_index, parent_name, parent_index): edge
-            for (child_name, child_index, parent_name, parent_index), edge in self.edge_iterator(
-                present_only=present_only
-            )
-        }
+        return dict(edge.to_tuple_format() for edge in self.edge_iterator(present_only=present_only))
 
     def add_node(self, node: TLACDCInterpNode, safe=True):
         if safe:

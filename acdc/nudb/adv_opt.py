@@ -8,6 +8,7 @@ from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 
 from acdc.TLACDCCorrespondence import TLACDCCorrespondence
+from acdc.TLACDCEdge import Edge
 from acdc.acdc_graphics import graph_from_edges
 from acdc.docstring.utils import AllDataThings
 from acdc.greaterthan.utils import get_greaterthan_true_edges, get_all_greaterthan_things
@@ -55,12 +56,12 @@ task_data, true_edges = get_task_data()
 
 
 @dataclass
-class AblationRunner:
+class MaskedRunner:
     model: HookedTransformer
 
     def run_with_ablated_edges(
         self,
-        edges_to_ablate: list,
+        edges_to_ablate: list[Edge],
         input: Num[torch.Tensor, "batch seq"],
         corrupted_input: Num[torch.Tensor, "batch seq"],
     ):
@@ -68,10 +69,23 @@ class AblationRunner:
         output_original, _ = self.model.run_with_cache(input)
         output_on_corrupted_input, corrupted_values_cache = self.model.run_with_cache(corrupted_input)
 
+        for edge in edges_to_ablate:
+            # what do I need to do here?
+            pass
+
+
+
+
+
+
+
         base_correspondence = TLACDCCorrespondence.setup_from_model(
             self.model, True if self.model.cfg.positional_embedding_type == "standard" else NotImplementedError()
         )
 
+
+
+        all_edges: list[Edge] = list(base_correspondence.edge_iterator())
         all_edges_collection = base_correspondence.edge_dict()
         g = graph_from_edges(edge_collection=all_edges_collection, filename="nielstest.png", show_everything=True)
 
@@ -89,7 +103,7 @@ class AblationRunner:
 
 @dataclass
 class AdvOptExperiment:
-    runner: AblationRunner
+    runner: MaskedRunner
     metric: Callable[[torch.Tensor], torch.Tensor]
     dataset: Shaped[
         torch.Tensor, "batch *data"
@@ -112,7 +126,7 @@ class AdvOptExperiment:
 
 
 experiment = AdvOptExperiment(
-    runner=AblationRunner(model=task_data.tl_model),
+    runner=MaskedRunner(model=task_data.tl_model),
     metric=task_data.validation_metric,
     dataset=task_data.test_data,
     corrupted_dataset=task_data.test_patch_data,

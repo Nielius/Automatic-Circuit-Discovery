@@ -119,7 +119,7 @@ class TorchIndex:
         return self.__repr__(use_actual_colon=use_actual_colon)
 
 
-@dataclass
+@dataclass(eq=True, frozen=True, slots=True)
 class IndexedHookPointName:
     hook_name: HookPointName
     index: TorchIndex
@@ -133,15 +133,21 @@ class IndexedHookPointName:
 
 @dataclass
 class Edge:
-    source: IndexedHookPointName
-    target: IndexedHookPointName
+    """An edge in the computational graph, pointing from parent to child."""
+    child: IndexedHookPointName
+    parent: IndexedHookPointName
     edge_info: EdgeInfo
 
     def __repr__(self) -> str:
-        return f"Edge({self.source}, {self.target}, {self.edge_info})"
+        return f"Edge({self.child}, {self.parent}, {self.edge_info})"
 
     def __str__(self) -> str:
-        return f"{self.source} -> {self.target} ({self.edge_info})"
+        return f"{self.child} -> {self.parent} ({self.edge_info})"
+
+    def to_tuple_format(self) -> tuple[tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], EdgeInfo]:
+        """This is the format used by the TLACDCCorrespondence object. Might want to deprecate it."""
+        return (self.child.hook_name, self.child.index, self.parent.hook_name, self.parent.index), self.edge_info
 
 
+# I think i want to deprecate this kind of object
 EdgeCollection: TypeAlias = dict[tuple[HookPointName, TorchIndex, HookPointName, TorchIndex], EdgeInfo]
