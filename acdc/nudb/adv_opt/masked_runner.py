@@ -20,7 +20,8 @@ class MaskedRunner:
     _indexed_parents_per_child: dict[HookPointName, list[IndexedHookPointName]]
 
     def __init__(self, model: HookedTransformer):
-        self.masked_transformer = MaskedTransformer(model=model)
+        assert model.cfg.positional_embedding_type in {"standard"}, "This is a temporary check; I don't know what values are possible here and what to do with them (in terms of whether or not they're using pos embed)"
+        self.masked_transformer = MaskedTransformer(model=model, use_pos_embed=model.cfg.positional_embedding_type == 'standard')
         self.masked_transformer.freeze_weights()
         self._freeze_all_masks()
         self._set_all_masks_to_pos_infty()
