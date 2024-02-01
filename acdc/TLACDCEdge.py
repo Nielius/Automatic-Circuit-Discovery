@@ -1,5 +1,3 @@
-import sys
-from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, List, TypeAlias
@@ -162,6 +160,26 @@ class Edge:
 
     child: IndexedHookPointName
     parent: IndexedHookPointName
+
+    @classmethod
+    def from_tuple_format(
+        cls,
+        child_hook_name: HookPointName,
+        child_hook_index: TorchIndex | list | tuple,
+        parent_hook_name: HookPointName,
+        parent_hook_index: TorchIndex | list | tuple,
+    ) -> "Edge":
+        child_hook_torch_index = (
+            TorchIndex(child_hook_index) if not isinstance(child_hook_index, TorchIndex) else child_hook_index
+        )
+        parent_hook_torch_index = (
+            TorchIndex(parent_hook_index) if not isinstance(parent_hook_index, TorchIndex) else parent_hook_index
+        )
+
+        return cls(
+            child=IndexedHookPointName(hook_name=child_hook_name, index=child_hook_torch_index),
+            parent=IndexedHookPointName(hook_name=parent_hook_name, index=parent_hook_torch_index),
+        )
 
 
 @dataclass
