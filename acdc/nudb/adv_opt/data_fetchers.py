@@ -8,7 +8,7 @@ from acdc.docstring.utils import AllDataThings, get_all_docstring_things, get_do
 from acdc.greaterthan.utils import get_all_greaterthan_things, get_greaterthan_true_edges
 from acdc.nudb.adv_opt.masked_runner import MaskedRunner
 from acdc.nudb.adv_opt.utils import device, num_examples, metric
-from acdc.tracr_task.utils import get_all_tracr_things, get_tracr_reverse_edges
+from acdc.tracr_task.utils import get_all_tracr_things, get_tracr_reverse_edges, get_tracr_proportion_edges
 
 
 def edge_tuples_to_dataclass(true_edges: dict[tuple[IndexedHookPointName, IndexedHookPointName], bool]) -> list[Edge]:
@@ -28,17 +28,34 @@ class AdvOptExperimentData:
 
 
 class AdvOptDataProvider(ABC):
-    def get_experiment_data(self) -> AdvOptExperimentData:
+    def get_experiment_data(
+        self,
+        num_examples: int,
+        metric_name: str,
+        device: str,
+    ) -> AdvOptExperimentData:
         raise NotImplementedError
 
 
 @dataclass
 class ACDCAdvOptDataProvider(AdvOptDataProvider):
-    task_data_fetcher: Callable[[], AllDataThings]
+    task_data_fetcher: Callable[..., AllDataThings]
     true_edges_fetcher: Callable[[], dict]
 
-    def get_experiment_data(self) -> AdvOptExperimentData:
-        task_data, true_edges = self.task_data_fetcher(), self.true_edges_fetcher()
+    def get_experiment_data(
+        self,
+        num_examples: int,
+        metric_name: str,
+        device: str,
+    ) -> AdvOptExperimentData:
+        task_data, true_edges = (
+            self.task_data_fetcher(
+                num_examples=num_examples,
+                metric_name=metric_name,
+                device=device,
+            ),
+            self.true_edges_fetcher(),
+        )
 
         return AdvOptExperimentData(
             task_data=task_data,
@@ -48,7 +65,12 @@ class ACDCAdvOptDataProvider(AdvOptDataProvider):
 
 
 class ACDCGreaterThanAdvOptDataProvider(AdvOptDataProvider):
-    def get_experiment_data(self) -> AdvOptExperimentData:
+    def get_experiment_data(
+        self,
+        num_examples: int,
+        metric_name: str,
+        device: str = "cpu",
+    ) -> AdvOptExperimentData:
         task_data = get_all_greaterthan_things(num_examples=num_examples, metric_name=metric, device=device)
         true_edges = get_greaterthan_true_edges(model=task_data.tl_model)
 
@@ -61,6 +83,7 @@ class ACDCGreaterThanAdvOptDataProvider(AdvOptDataProvider):
 
 class AdvOptExperimentName(str, Enum):
     TRACR_REVERSE = "tracr_reverse"
+    TRACR_PROPORTION = "tracr_proportion"
     DOCSTRING = "docstring"
     INDUCTION = "induction"
     GREATERTHAN = "greaterthan"
@@ -68,8 +91,22 @@ class AdvOptExperimentName(str, Enum):
 
 EXPERIMENT_DATA_PROVIDERS: dict[AdvOptExperimentName, AdvOptDataProvider] = {
     AdvOptExperimentName.TRACR_REVERSE: ACDCAdvOptDataProvider(
-        task_data_fetcher=lambda: get_all_tracr_things(task="reverse", metric_name="l2", num_examples=6, device=device),
+        # tracr-reverse is a task that takes a permutation of [0, 1, 2] and returns the reverse of it.
+        # There are only 6 data points.
+        # Only 1 attention head.
+        # KL divergence is not well-defined for its output.
+        task_data_fetcher=lambda num_examples=6, metric_name="l2", device="cpu": get_all_tracr_things(
+            task="reverse", metric_name="l2", num_examples=6, device=device
+        ),
         true_edges_fetcher=get_tracr_reverse_edges,
+    ),
+    AdvOptExperimentName.TRACR_PROPORTION: ACDCAdvOptDataProvider(
+        # tracr-proportion is a task that takes a permutation of [0, 1, 2] and returns the proportion of the
+        # first element in the permutation.
+        task_data_fetcher=lambda num_examples=10, metric_name="kl_div", device="cpu": get_all_tracr_things(
+            task="proportion", metric_name=metric_name, num_examples=num_examples, device=device
+        ),
+        true_edges_fetcher=get_tracr_proportion_edges,
     ),
     AdvOptExperimentName.DOCSTRING: ACDCAdvOptDataProvider(
         task_data_fetcher=lambda: get_all_docstring_things(num_examples=10, seq_len=4, device=device),
