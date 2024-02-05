@@ -20,6 +20,7 @@ class AdvOptExperimentData:
     task_data: AllDataThings
     circuit_edges: list[Edge]
     masked_runner: MaskedRunner
+    metric_last_sequence_position_only: bool = False
 
     @property
     def ablated_edges(self) -> set[Edge]:
@@ -41,6 +42,7 @@ class AdvOptDataProvider(ABC):
 class ACDCAdvOptDataProvider(AdvOptDataProvider):
     task_data_fetcher: Callable[..., AllDataThings]
     true_edges_fetcher: Callable[[], dict]
+    metric_last_sequence_position_only: bool = False
 
     def get_experiment_data(
         self,
@@ -109,8 +111,11 @@ EXPERIMENT_DATA_PROVIDERS: dict[AdvOptExperimentName, AdvOptDataProvider] = {
         true_edges_fetcher=get_tracr_proportion_edges,
     ),
     AdvOptExperimentName.DOCSTRING: ACDCAdvOptDataProvider(
-        task_data_fetcher=lambda: get_all_docstring_things(num_examples=10, seq_len=4, device=device),
+        task_data_fetcher=lambda num_examples, metric_name, device: get_all_docstring_things(
+            num_examples=num_examples, metric_name=metric_name, seq_len=4, device=device
+        ),
         true_edges_fetcher=get_docstring_subgraph_true_edges,
+        metric_last_sequence_position_only=True,
     ),
     AdvOptExperimentName.GREATERTHAN: ACDCGreaterThanAdvOptDataProvider(),
     # No canonical circuit for induction?

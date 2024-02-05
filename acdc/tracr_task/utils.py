@@ -273,7 +273,7 @@ def get_all_tracr_things(
     _, tl_model = get_tracr_model_input_and_tl_model(task=task, device=device)
 
     if task == "reverse":
-        batch_size = 6
+        batch_size = 6  # there are only 6 permutations of 3 elements
         seq_len = 4
         data_tens = torch.zeros((batch_size, seq_len), device=device, dtype=torch.long)
 

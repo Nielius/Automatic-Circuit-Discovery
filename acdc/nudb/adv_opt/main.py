@@ -1,3 +1,4 @@
+import datetime
 import logging
 import random
 from dataclasses import dataclass
@@ -8,7 +9,7 @@ from jaxtyping import Float
 
 from acdc.TLACDCEdge import Edge
 from acdc.nudb.adv_opt.data_fetchers import EXPERIMENT_DATA_PROVIDERS, AdvOptExperimentName, AdvOptExperimentData
-from acdc.nudb.adv_opt.utils import device
+from acdc.nudb.adv_opt.utils import device, CIRCUITBENCHMARKS_DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,6 @@ class AdvOptExperiment:
         self,
         circuit: list[Edge],
         # comparision_circuit: list[Edge] | None = None,
-        last_sequence_position_only: bool = False,
     ) -> Float[torch.Tensor, "batch"]:
         """
         Run and calculate an individual metric for each input.
@@ -62,22 +62,25 @@ class AdvOptExperiment:
             edges_to_ablate=[],
         )
 
-        # TODO NUDB:
-        # depending on the task, we only want to take the last sequence position or not.
-        # E.g. for the reverse task, every sequence position matters.
-        # But probably for many others it doesn't
+        if self.experiment_data.metric_last_sequence_position_only:
+            # depending on the task, we only want to take the last sequence position or not.
+            # E.g. for the reverse task, every sequence position matters.
+            # But for e.g. the docstring task, we only want to get the metrics
+            # from the final sequence position.
+            metrics = F.kl_div(
+                F.log_softmax(masked_output_logits[:, -1, :], dim=-1),
+                F.log_softmax(base_output_logits[:, -1, :], dim=-1),
+                reduction="none",
+                log_target=True,
+            ).mean(dim=-1)
 
-        metrics = F.kl_div(
-            F.log_softmax(masked_output_logits, dim=-1),
-            F.log_softmax(base_output_logits, dim=-1),
-            reduction="none",
-            log_target=True,
-        ).mean(dim=-1)
-
-        if last_sequence_position_only:
-            raise NotImplementedError()
         else:
-            metrics = metrics.mean(dim=-1)
+            metrics = F.kl_div(
+                F.log_softmax(masked_output_logits, dim=-1),
+                F.log_softmax(base_output_logits, dim=-1),
+                reduction="none",
+                log_target=True,
+            ).mean(dim=-1).mean(dim=-1) # mean over sequence position and output logit
 
         return metrics
 
@@ -116,23 +119,28 @@ def run_with_random_circuit(experiment: AdvOptExperiment) -> float:
     )
 
 
-def main_for_tracr_reverse():
-    experiment_tracr_reverse = AdvOptExperiment(
-        experiment_data=EXPERIMENT_DATA_PROVIDERS[AdvOptExperimentName.TRACR_REVERSE].get_experiment_data(
-            num_examples=6,
-            metric_name="l2",
+def main_for_plotting_three_experiments(experiment_name: AdvOptExperimentName):
+    experiment = AdvOptExperiment(
+        experiment_data=EXPERIMENT_DATA_PROVIDERS[experiment_name].get_experiment_data(
+            num_examples=100,
+            metric_name="l2" if experiment_name == AdvOptExperimentName.TRACR_REVERSE else "kl_div",
             device=device,
         )
     )
 
-    metrics_with_canonical_circuit = experiment_tracr_reverse.run_with_individual_metrics(
-        circuit=experiment_tracr_reverse.experiment_data.circuit_edges
+    # Debugging code: decode the input data with tokenizer
+    # experiment.experiment_data.masked_runner.masked_transformer.model.tokenizer.decode(
+    #     experiment.experiment_data.task_data.test_data[0]
+    # )
+
+    metrics_with_canonical_circuit = experiment.run_with_individual_metrics(
+        circuit=experiment.experiment_data.circuit_edges
     )
-    metrics_with_random_circuit = experiment_tracr_reverse.run_with_individual_metrics(
-        circuit=experiment_tracr_reverse.random_circuit()
+    metrics_with_random_circuit = experiment.run_with_individual_metrics(
+        circuit=experiment.random_circuit()
     )
-    metrics_with_corrupted_canonical_circuit = experiment_tracr_reverse.run_with_individual_metrics(
-        circuit=experiment_tracr_reverse.canonical_circuit_with_random_edges_removed(2)
+    metrics_with_corrupted_canonical_circuit = experiment.run_with_individual_metrics(
+        circuit=experiment.canonical_circuit_with_random_edges_removed(2)
     )
     logger.info("Metric is %s", metrics_with_canonical_circuit)
 
@@ -161,7 +169,12 @@ def main_for_tracr_reverse():
     ax.set_title("KL divergence for tracr-reverse, histogram")
     ax.legend()
 
-    print(123)
+    plot_dir = CIRCUITBENCHMARKS_DATA_DIR / "plots"
+    plot_dir.mkdir(exist_ok=True)
+    figure_path = plot_dir / f"{experiment_name}_histogram_{datetime.datetime.now().isoformat()}.png"
+    fig.savefig(figure_path)
+    logger.info("Saved histogram to %s", figure_path)
+
 
 
 def main_for_tracr_proportion():
@@ -210,4 +223,5 @@ def main_for_tracr_proportion():
 
 
 # main_for_tracr_proportion()
-main_for_tracr_reverse()
+# main_for_plotting_three_experiments(AdvOptExperimentName.TRACR_REVERSE)
+main_for_plotting_three_experiments(AdvOptExperimentName.DOCSTRING)
