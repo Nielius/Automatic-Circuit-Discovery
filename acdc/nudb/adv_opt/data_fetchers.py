@@ -3,9 +3,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable
 
+from transformer_lens import HookedTransformer
+
 from acdc.TLACDCEdge import Edge, IndexedHookPointName
 from acdc.docstring.utils import AllDataThings, get_all_docstring_things, get_docstring_subgraph_true_edges
 from acdc.greaterthan.utils import get_all_greaterthan_things, get_greaterthan_true_edges
+from acdc.ioi.utils import get_all_ioi_things, get_ioi_true_edges
 from acdc.nudb.adv_opt.masked_runner import MaskedRunner
 from acdc.nudb.adv_opt.utils import device, num_examples, metric
 from acdc.tracr_task.utils import get_all_tracr_things, get_tracr_reverse_edges, get_tracr_proportion_edges
@@ -41,7 +44,7 @@ class AdvOptDataProvider(ABC):
 @dataclass
 class ACDCAdvOptDataProvider(AdvOptDataProvider):
     task_data_fetcher: Callable[..., AllDataThings]
-    true_edges_fetcher: Callable[[], dict]
+    true_edges_fetcher: Callable[[HookedTransformer], dict]
     metric_last_sequence_position_only: bool = False
 
     def get_experiment_data(
@@ -50,36 +53,18 @@ class ACDCAdvOptDataProvider(AdvOptDataProvider):
         metric_name: str,
         device: str,
     ) -> AdvOptExperimentData:
-        task_data, true_edges = (
-            self.task_data_fetcher(
-                num_examples=num_examples,
-                metric_name=metric_name,
-                device=device,
-            ),
-            self.true_edges_fetcher(),
+        task_data = self.task_data_fetcher(
+            num_examples=num_examples,
+            metric_name=metric_name,
+            device=device,
         )
+        true_edges = self.true_edges_fetcher(task_data.tl_model)
 
         return AdvOptExperimentData(
             task_data=task_data,
             circuit_edges=edge_tuples_to_dataclass(true_edges),
             masked_runner=MaskedRunner(model=task_data.tl_model),
-        )
-
-
-class ACDCGreaterThanAdvOptDataProvider(AdvOptDataProvider):
-    def get_experiment_data(
-        self,
-        num_examples: int,
-        metric_name: str,
-        device: str = "cpu",
-    ) -> AdvOptExperimentData:
-        task_data = get_all_greaterthan_things(num_examples=num_examples, metric_name=metric, device=device)
-        true_edges = get_greaterthan_true_edges(model=task_data.tl_model)
-
-        return AdvOptExperimentData(
-            task_data=task_data,
-            circuit_edges=edge_tuples_to_dataclass(true_edges),
-            masked_runner=MaskedRunner(model=task_data.tl_model),
+            metric_last_sequence_position_only=self.metric_last_sequence_position_only,
         )
 
 
@@ -89,6 +74,7 @@ class AdvOptExperimentName(str, Enum):
     DOCSTRING = "docstring"
     INDUCTION = "induction"
     GREATERTHAN = "greaterthan"
+    IOI = "ioi"
 
 
 EXPERIMENT_DATA_PROVIDERS: dict[AdvOptExperimentName, AdvOptDataProvider] = {
@@ -100,7 +86,7 @@ EXPERIMENT_DATA_PROVIDERS: dict[AdvOptExperimentName, AdvOptDataProvider] = {
         task_data_fetcher=lambda num_examples=6, metric_name="l2", device="cpu": get_all_tracr_things(
             task="reverse", metric_name="l2", num_examples=6, device=device
         ),
-        true_edges_fetcher=get_tracr_reverse_edges,
+        true_edges_fetcher=lambda model: get_tracr_reverse_edges(),
     ),
     AdvOptExperimentName.TRACR_PROPORTION: ACDCAdvOptDataProvider(
         # tracr-proportion is a task that takes a permutation of [0, 1, 2] and returns the proportion of the
@@ -108,16 +94,29 @@ EXPERIMENT_DATA_PROVIDERS: dict[AdvOptExperimentName, AdvOptDataProvider] = {
         task_data_fetcher=lambda num_examples=10, metric_name="kl_div", device="cpu": get_all_tracr_things(
             task="proportion", metric_name=metric_name, num_examples=num_examples, device=device
         ),
-        true_edges_fetcher=get_tracr_proportion_edges,
+        true_edges_fetcher=lambda model: get_tracr_proportion_edges(),
     ),
     AdvOptExperimentName.DOCSTRING: ACDCAdvOptDataProvider(
         task_data_fetcher=lambda num_examples, metric_name, device: get_all_docstring_things(
             num_examples=num_examples, metric_name=metric_name, seq_len=4, device=device
         ),
-        true_edges_fetcher=get_docstring_subgraph_true_edges,
+        true_edges_fetcher=lambda model: get_docstring_subgraph_true_edges(),
         metric_last_sequence_position_only=True,
     ),
-    AdvOptExperimentName.GREATERTHAN: ACDCGreaterThanAdvOptDataProvider(),
+    AdvOptExperimentName.GREATERTHAN: ACDCAdvOptDataProvider(
+        task_data_fetcher=lambda num_examples, metric_name, device: get_all_greaterthan_things(
+            num_examples=num_examples, metric_name=metric_name, device=device
+        ),
+        true_edges_fetcher=get_greaterthan_true_edges,
+        metric_last_sequence_position_only=True,
+    ),
+    AdvOptExperimentName.IOI: ACDCAdvOptDataProvider(
+        task_data_fetcher=lambda num_examples, metric_name, device: get_all_ioi_things(
+            num_examples=num_examples, metric_name=metric_name, device=device
+        ),
+        true_edges_fetcher=get_ioi_true_edges,
+        metric_last_sequence_position_only=True,
+    )
     # No canonical circuit for induction?
     # AdvOptExperimentName.INDUCTION
 }
