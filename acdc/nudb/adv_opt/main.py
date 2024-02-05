@@ -1,10 +1,12 @@
 import datetime
+import itertools
 import logging
 import random
 from dataclasses import dataclass
-import torch.nn.functional as F
 
+import matplotlib.pyplot as plt
 import torch
+import torch.nn.functional as F
 from jaxtyping import Float
 
 from acdc.TLACDCEdge import Edge
@@ -44,7 +46,8 @@ class AdvOptExperiment:
         # comparision_circuit: list[Edge] | None = None,
     ) -> Float[torch.Tensor, "batch"]:
         """
-        Run and calculate an individual metric for each input.
+        Run and calculate an individual metric for each input. The metric compares the output for the circuit
+        with the output for the full model.
 
         'last_sequence_position_only' is a flag that should be set to True for tasks where only the last sequence position matters.
         If set to True, the metric will be calculated only for the last sequence position.
@@ -73,14 +76,17 @@ class AdvOptExperiment:
                 reduction="none",
                 log_target=True,
             ).mean(dim=-1)
-
         else:
-            metrics = F.kl_div(
-                F.log_softmax(masked_output_logits, dim=-1),
-                F.log_softmax(base_output_logits, dim=-1),
-                reduction="none",
-                log_target=True,
-            ).mean(dim=-1).mean(dim=-1) # mean over sequence position and output logit
+            metrics = (
+                F.kl_div(
+                    F.log_softmax(masked_output_logits, dim=-1),
+                    F.log_softmax(base_output_logits, dim=-1),
+                    reduction="none",
+                    log_target=True,
+                )
+                .mean(dim=-1)
+                .mean(dim=-1)
+            )  # mean over sequence position and output logit
 
         return metrics
 
@@ -120,61 +126,98 @@ def run_with_random_circuit(experiment: AdvOptExperiment) -> float:
 
 
 def main_for_plotting_three_experiments(experiment_name: AdvOptExperimentName):
+    logger.info("Starting plotting experiment for '%s'.", experiment_name)
     experiment = AdvOptExperiment(
         experiment_data=EXPERIMENT_DATA_PROVIDERS[experiment_name].get_experiment_data(
-            num_examples=100,
+            num_examples=6,
             metric_name="l2" if experiment_name == AdvOptExperimentName.TRACR_REVERSE else "kl_div",
             device=device,
         )
     )
 
+    logger.info("Running with all edges")
+    metrics_with_full_model = experiment.run_with_individual_metrics(
+        circuit=list(experiment.experiment_data.masked_runner.all_ablatable_edges)
+    )
+
+    logger.info("Running with canonical circuit")
+    metrics_with_canonical_circuit = experiment.run_with_individual_metrics(
+        circuit=experiment.experiment_data.circuit_edges
+    )
+
+    logger.info("Running with a random circuit")
+    metrics_with_random_circuit = experiment.run_with_individual_metrics(circuit=experiment.random_circuit())
+
+    logger.info("Running with the canonical circuit, but with 2 random edges removed")
+    metrics_with_corrupted_canonical_circuit = experiment.run_with_individual_metrics(
+        circuit=experiment.canonical_circuit_with_random_edges_removed(2)
+    )
+
+    def plot():
+        # plot histogram of output
+        fig, axes = plt.subplots(2, 2, sharex=True, sharey=True)  # Create a figure containing a single axes.
+        ((ax_all, ax_1), (ax_2, ax_3)) = axes
+        range = (
+            0,
+            max(
+                metrics_with_full_model.max().item(),
+                metrics_with_canonical_circuit.max().item(),
+                metrics_with_random_circuit.max().item(),
+                metrics_with_corrupted_canonical_circuit.max().item(),
+            ),
+        )
+        ax_all.stairs(*torch.histogram(metrics_with_full_model, bins=100, range=range), label="full model")
+        ax_all.stairs(
+            *torch.histogram(metrics_with_canonical_circuit, bins=100, range=range), label="canonical circuit"
+        )
+        ax_all.stairs(*torch.histogram(metrics_with_random_circuit, bins=100, range=range), label="random circuit")
+        ax_all.stairs(
+            *torch.histogram(metrics_with_corrupted_canonical_circuit, bins=100, range=range),
+            label="corrupted canonical circuit",
+        )
+        fig.suptitle(
+            f"KL divergence between output of the full model and output of a circuit, for {experiment_name}, histogram"
+        )
+        ax_1.stairs(*torch.histogram(metrics_with_canonical_circuit, bins=100, range=range), label="canonical circuit")
+        ax_2.stairs(*torch.histogram(metrics_with_random_circuit, bins=100, range=range), label="random circuit")
+        ax_3.stairs(
+            *torch.histogram(metrics_with_corrupted_canonical_circuit, bins=100, range=range),
+            label="corrupted canonical circuit",
+        )
+        for ax in itertools.chain(*axes):
+            ax.set_xlabel("KL divergence")
+            ax.set_ylabel("Frequency")
+            ax.legend()
+
+        plot_dir = CIRCUITBENCHMARKS_DATA_DIR / "plots"
+        plot_dir.mkdir(exist_ok=True)
+        figure_path = plot_dir / f"{experiment_name}_histogram_{datetime.datetime.now().isoformat()}.png"
+        fig.savefig(figure_path)
+        logger.info("Saved histogram to %s", figure_path)
+
+    plot()
+
+    topk_most_adversarial = torch.topk(metrics_with_random_circuit, k=5, sorted=True)
+    topk_most_adversarial_input = experiment.experiment_data.task_data.test_data[topk_most_adversarial.indices, :]
+
+    if experiment.experiment_data.masked_runner.masked_transformer.model.tokenizer is not None:
+        # decode if a tokenizer is given
+        topk_most_adversarial_input = [
+            experiment.experiment_data.masked_runner.masked_transformer.model.tokenizer.decode(input)
+            for input in topk_most_adversarial_input
+        ]
+
+    logger.info(
+        "Top 5 most adversarial examples with loss '%s': %s",
+        topk_most_adversarial.values,
+        topk_most_adversarial_input,
+    )
+
+
     # Debugging code: decode the input data with tokenizer
     # experiment.experiment_data.masked_runner.masked_transformer.model.tokenizer.decode(
     #     experiment.experiment_data.task_data.test_data[0]
     # )
-
-    metrics_with_canonical_circuit = experiment.run_with_individual_metrics(
-        circuit=experiment.experiment_data.circuit_edges
-    )
-    metrics_with_random_circuit = experiment.run_with_individual_metrics(
-        circuit=experiment.random_circuit()
-    )
-    metrics_with_corrupted_canonical_circuit = experiment.run_with_individual_metrics(
-        circuit=experiment.canonical_circuit_with_random_edges_removed(2)
-    )
-    logger.info("Metric is %s", metrics_with_canonical_circuit)
-
-    torch.histogram(metrics_with_canonical_circuit, bins=100)
-
-    # plot histogram of output
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots()  # Create a figure containing a single axes.
-    range = (
-        0,
-        max(
-            metrics_with_canonical_circuit.max().item(),
-            metrics_with_random_circuit.max().item(),
-            metrics_with_corrupted_canonical_circuit.max().item(),
-        ),
-    )
-    ax.stairs(*torch.histogram(metrics_with_canonical_circuit, bins=100, range=range), label="canonical circuit")
-    ax.stairs(*torch.histogram(metrics_with_random_circuit, bins=100, range=range), label="random circuit")
-    ax.stairs(
-        *torch.histogram(metrics_with_corrupted_canonical_circuit, bins=100, range=range),
-        label="corrupted canonical circuit"
-    )
-    ax.set_xlabel("KL divergence")
-    ax.set_ylabel("Frequency")
-    ax.set_title("KL divergence for tracr-reverse, histogram")
-    ax.legend()
-
-    plot_dir = CIRCUITBENCHMARKS_DATA_DIR / "plots"
-    plot_dir.mkdir(exist_ok=True)
-    figure_path = plot_dir / f"{experiment_name}_histogram_{datetime.datetime.now().isoformat()}.png"
-    fig.savefig(figure_path)
-    logger.info("Saved histogram to %s", figure_path)
-
 
 
 def main_for_tracr_proportion():
@@ -222,6 +265,11 @@ def main_for_tracr_proportion():
     run_with_random_circuit(experiment)
 
 
-# main_for_tracr_proportion()
-# main_for_plotting_three_experiments(AdvOptExperimentName.TRACR_REVERSE)
-main_for_plotting_three_experiments(AdvOptExperimentName.DOCSTRING)
+if __name__ == "__main__":
+    logger.info("Using device %s", device)
+
+    # main_for_tracr_proportion()
+    main_for_plotting_three_experiments(AdvOptExperimentName.TRACR_REVERSE)
+    # main_for_plotting_three_experiments(AdvOptExperimentName.DOCSTRING)
+    # main_for_plotting_three_experiments(AdvOptExperimentName.GREATERTHAN)
+    # main_for_plotting_three_experiments(AdvOptExperimentName.IOI)

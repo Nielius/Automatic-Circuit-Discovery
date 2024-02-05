@@ -1,4 +1,5 @@
 import itertools
+from functools import cached_property
 
 import torch
 from jaxtyping import Num
@@ -62,7 +63,7 @@ class MaskedRunner:
         # todo: I think child.index.as_index[-1] shows that we're not using the right abstraction here; or maybe it doesn't?
         self.masked_transformer._mask_logits_dict[child.hook_name][parent_index][child.index.as_index[-1]] = value
 
-    @property
+    @cached_property
     def all_ablatable_edges(self) -> set[Edge]:
         return {
             Edge(child=indexed_child, parent=indexed_parent)
